@@ -19,6 +19,7 @@ import { Functions, httpsCallable } from "firebase/functions";
 import { ArxivMetadata, LumiDoc } from "./lumi_doc";
 import { LumiAnswer, LumiAnswerRequest, UserFeedback } from "./api";
 import { PaperData } from "./types_local_storage";
+import { ModelConfig } from "./model_config";
 
 /** Firebase cloud function callables */
 
@@ -52,21 +53,22 @@ export const requestArxivDocImportCallable = async (
  * @param functions The Firebase Functions instance.
  * @param doc The full LumiDoc object.
  * @param request The user's request details.
+ * @param modelConfig The user's model configuration (provider/model/key).
  * @returns A LumiAnswer object.
  */
 export const getLumiResponseCallable = async (
   functions: Functions,
   doc: LumiDoc,
   request: LumiAnswerRequest,
-  apiKey: string | null
+  modelConfig: ModelConfig
 ): Promise<LumiAnswer> => {
   const result = await httpsCallable<
-    { doc: LumiDoc; request: LumiAnswerRequest; apiKey: string | null },
+    { doc: LumiDoc; request: LumiAnswerRequest; modelConfig: ModelConfig },
     LumiAnswer
   >(
     functions,
     "get_lumi_response"
-  )({ doc, request, apiKey });
+  )({ doc, request, modelConfig });
 
   return result.data;
 };
@@ -94,21 +96,22 @@ export const getArxivMetadata = async (
  * @param functions The Firebase Functions instance.
  * @param doc The full LumiDoc object.
  * @param pastPapers The user's past papers from local history.
+ * @param modelConfig The user's model configuration (provider/model/key).
  * @returns A PersonalSummary object.
  */
 export const getPersonalSummaryCallable = async (
   functions: Functions,
   doc: LumiDoc,
   pastPapers: PaperData[],
-  apiKey: string | null
+  modelConfig: ModelConfig
 ): Promise<LumiAnswer> => {
   const result = await httpsCallable<
-    { doc: LumiDoc; past_papers: PaperData[]; apiKey: string | null },
+    { doc: LumiDoc; past_papers: PaperData[]; modelConfig: ModelConfig },
     LumiAnswer
   >(
     functions,
     "get_personal_summary"
-  )({ doc, past_papers: pastPapers, apiKey });
+  )({ doc, past_papers: pastPapers, modelConfig });
 
   return result.data;
 };

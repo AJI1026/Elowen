@@ -29,14 +29,17 @@ from shared.utils import get_unique_id
 def generate_lumi_answer(
     doc: LumiDoc,
     request: LumiAnswerRequest,
-    api_key: str|None
+    api_key: str|None,
+    model_config: dict|None = None
 ) -> LumiAnswer:
     """
-    Generates a LumiAnswer by calling the Gemini API.
+    Generates a LumiAnswer by calling the configured LLM.
 
     This function selects the appropriate prompt based on the user's request
-    (query, highlight, or both), calls the Gemini model to get a markdown
-    response with inline citations, and then formats it into a LumiAnswer object.
+    (query, highlight, or both), calls the LLM to get a markdown response with
+    inline citations, and then formats it into a LumiAnswer object. ``api_key``
+    is kept for backward compatibility; ``model_config`` may carry per-request
+    provider/model/base_url overrides.
     """
     query = request.query
     highlight = request.highlight
@@ -102,10 +105,13 @@ Last Updated: {metadata.updated_timestamp}
     if image_info:
         image_bytes = image_utils.download_image_from_gcs(image_info.image_storage_path)
         markdown_response = gemini.call_predict_with_image(
-            prompt=prompt, image_bytes=image_bytes, api_key=api_key
+            prompt=prompt, image_bytes=image_bytes, api_key=api_key,
+            model_config=model_config
         )
     else:
-        markdown_response = gemini.call_predict(prompt, api_key=api_key)
+        markdown_response = gemini.call_predict(
+            prompt, api_key=api_key, model_config=model_config
+        )
 
     # Extract equations before markdown conversion to prevent misinterpretation.
     markdown_response, equation_map = markdown_utils.extract_equations_to_placeholders(markdown_response)

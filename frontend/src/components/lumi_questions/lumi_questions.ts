@@ -140,7 +140,7 @@ export class LumiQuestions extends LightMobxLitElement {
         this.firebaseService.functions,
         lumiDoc,
         request,
-        this.settingsService.apiKey.value
+        this.settingsService.getModelConfig()
       );
       this.historyService.addAnswer(docId, response);
       this.query = "";

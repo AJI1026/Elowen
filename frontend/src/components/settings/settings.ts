@@ -31,6 +31,11 @@ import { SettingsService } from "../../services/settings.service";
 import { ArxivMetadata } from "../../shared/lumi_doc";
 import { sortPaperDataByTimestamp } from "../../shared/lumi_paper_utils";
 import { ColorMode } from "../../shared/types";
+import {
+  DEFAULT_BASE_URLS,
+  DEFAULT_MODEL_NAMES,
+  ModelProvider,
+} from "../../shared/model_config";
 
 import { styles } from "./settings.scss";
 
@@ -48,22 +53,68 @@ export class Settings extends MobxLitElement {
           <reading-history showTitle></reading-history>
         </div>
         <div class="section">
-          <h2>Model API Key</h2>
+          <h2>Model</h2>
           <div>
-            Optional: Use your own
-            <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noopener noreferrer">Gemini API key</a>
-            for "Ask Lumi"
-            queries inside a paper. Your API key will never be used to
-            import papers.
+            Optional: Configure the LLM used for "Ask Lumi" queries inside a
+            paper. Your API key will never be used to import papers.
           </div>
+
+          <div class="field">
+            <div class="action-buttons">
+              <pr-button
+                color=${this.settingsService.modelProvider.value === ModelProvider.GEMINI ? "primary" : "neutral"}
+                variant=${this.settingsService.modelProvider.value === ModelProvider.GEMINI ? "tonal" : "default"}
+                @click=${() => this.selectProvider(ModelProvider.GEMINI)}
+              >
+                Gemini
+              </pr-button>
+              <pr-button
+                color=${this.settingsService.modelProvider.value === ModelProvider.DEEPSEEK ? "primary" : "neutral"}
+                variant=${this.settingsService.modelProvider.value === ModelProvider.DEEPSEEK ? "tonal" : "default"}
+                @click=${() => this.selectProvider(ModelProvider.DEEPSEEK)}
+              >
+                DeepSeek
+              </pr-button>
+              <pr-button
+                color=${this.settingsService.modelProvider.value === ModelProvider.OPENAI ? "primary" : "neutral"}
+                variant=${this.settingsService.modelProvider.value === ModelProvider.OPENAI ? "tonal" : "default"}
+                @click=${() => this.selectProvider(ModelProvider.OPENAI)}
+              >
+                OpenAI
+              </pr-button>
+            </div>
+          </div>
+
+          <div class="field">
+            <pr-textinput
+              .value=${this.settingsService.modelName.value}
+              .onChange=${(e: InputEvent) => {
+                this.settingsService.modelName.value = (e.target as HTMLInputElement).value;
+              }}
+              placeholder=${DEFAULT_MODEL_NAMES[this.settingsService.modelProvider.value] ?? "Model name"}
+              label="Model name"
+            ></pr-textinput>
+          </div>
+
+          <div class="field">
+            <pr-textinput
+              .value=${this.settingsService.modelBaseUrl.value}
+              .onChange=${(e: InputEvent) => {
+                this.settingsService.modelBaseUrl.value = (e.target as HTMLInputElement).value;
+              }}
+              placeholder=${DEFAULT_BASE_URLS[this.settingsService.modelProvider.value] ?? "https://api.example.com"}
+              label="Base URL (optional)"
+            ></pr-textinput>
+          </div>
+
           <div class="field">
             <pr-textinput
               .value=${this.settingsService.apiKey.value}
               .onChange=${(e: InputEvent) => {
-                const value = (e.target as HTMLInputElement).value;
-                this.settingsService.apiKey.value = value;
+                this.settingsService.apiKey.value = (e.target as HTMLInputElement).value;
               }}
-              placeholder="Paste Gemini API key here"
+              placeholder="Paste API key here"
+              label="API key"
             ></pr-textinput>
           </div>
         </div>
@@ -73,6 +124,11 @@ export class Settings extends MobxLitElement {
         </div>
       </div>
     `;
+  }
+
+  /** Applies provider defaults when the user switches provider. */
+  private selectProvider(provider: ModelProvider) {
+    this.settingsService.applyProviderDefaults(provider);
   }
 
   private renderColorModeSection() {

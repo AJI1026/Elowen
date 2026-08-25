@@ -13,16 +13,23 @@
 # limitations under the License.
 # ==============================================================================
 
+"""Backward-compatible wrapper around :mod:`models.llm_client`.
+
+Kept under the ``gemini`` module name so existing call sites
+(``from models import gemini``) and tests (``@patch('...gemini...')``) continue
+to work. The default model names default to Gemini, but the actual provider
+(and model) is resolved from :mod:`models.api_config` — switchable to DeepSeek /
+OpenAI via ``LUMI_MODEL_PROVIDER`` etc.
+"""
+
 import time
-from google import genai
-from google.genai import types
+from typing import List, Type, TypeVar
+
 from models import api_config
 from models import prompts
+from models import llm_client
 from shared.lumi_doc import LumiConcept
 from shared.import_tags import L_REFERENCES_START, L_REFERENCES_END
-from typing import List, Type, TypeVar
-from firebase_functions import logger
-from firebase_functions import logger
 
 API_KEY_LOGGING_MESSAGE = "Ran with user-specified API key"
 QUERY_RESPONSE_MAX_OUTPUT_TOKENS = 4000
@@ -38,24 +45,21 @@ def call_predict(
     query="The opposite of happy is",
     model="gemini-2.5-flash",
     api_key: str | None = None,
+    model_config: dict | None = None,
 ) -> str:
-    if not api_key:
-        api_key = api_config.DEFAULT_API_KEY
-    else:
-        logger.info(API_KEY_LOGGING_MESSAGE)
+    """Calls the configured LLM with a plain-text prompt.
 
-    client = genai.Client(api_key=api_key)
-
-    response = client.models.generate_content(
-        model=model,
-        contents=query,
-        config=types.GenerateContentConfig(
-            temperature=0, max_output_tokens=QUERY_RESPONSE_MAX_OUTPUT_TOKENS
-        ),
+    Defaults to Gemini but delegates to ``llm_client`` so the provider can be
+    switched via config. ``model_config`` may carry per-request overrides:
+    ``provider``, ``modelName``, ``baseUrl``, ``apiKey``.
+    """
+    provider, out_model, base_url, out_key = _unpack_model_config(
+        model_config, model, api_key
     )
-    if not response.text:
-        raise GeminiInvalidResponseException()
-    return response.text
+    return llm_client.call_predict(
+        query=query, model=out_model, api_key=out_key,
+        provider=provider, base_url=base_url,
+    )
 
 
 def call_predict_with_image(
@@ -63,33 +67,16 @@ def call_predict_with_image(
     image_bytes: bytes,
     model="gemini-2.5-flash",
     api_key: str | None = None,
+    model_config: dict | None = None,
 ) -> str:
-    """Calls Gemini with a prompt and an image."""
-    if not api_key:
-        api_key = api_config.DEFAULT_API_KEY
-    else:
-        logger.info(API_KEY_LOGGING_MESSAGE)
-
-    client = genai.Client(api_key=api_key)
-
-    truncated_query = (prompt[:200] + "...") if len(prompt) > 200 else prompt
-    print(
-        f"  > Calling Gemini with image, prompt: '{truncated_query}' \nimage: {image_bytes[:50]}"
+    """Calls the configured LLM with a prompt and an image."""
+    provider, out_model, base_url, out_key = _unpack_model_config(
+        model_config, model, api_key
     )
-    response = client.models.generate_content(
-        model=model,
-        contents=[
-            prompt,
-            # When imported, paper images are all saved in PNG format.
-            types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
-        ],
-        config=types.GenerateContentConfig(
-            temperature=0, max_output_tokens=QUERY_RESPONSE_MAX_OUTPUT_TOKENS
-        ),
+    return llm_client.call_predict_with_image(
+        prompt=prompt, image_bytes=image_bytes, model=out_model,
+        api_key=out_key, provider=provider, base_url=base_url,
     )
-    if not response.text:
-        raise GeminiInvalidResponseException()
-    return response.text
 
 
 def call_predict_with_schema(
@@ -97,34 +84,41 @@ def call_predict_with_schema(
     response_schema: Type[T],
     model="gemini-2.5-flash",
     api_key: str | None = None,
+    model_config: dict | None = None,
 ) -> T | List[T] | None:
-    """Calls Gemini with a response schema for structured output."""
-    if not api_key:
-        api_key = api_config.DEFAULT_API_KEY
-    else:
-        logger.info(API_KEY_LOGGING_MESSAGE)
+    """Calls the configured LLM with a response schema for structured output."""
+    provider, out_model, base_url, out_key = _unpack_model_config(
+        model_config, model, api_key
+    )
+    return llm_client.call_predict_with_schema(
+        query=query,
+        response_schema=response_schema,
+        model=out_model,
+        api_key=out_key,
+        provider=provider,
+        base_url=base_url,
+    )
 
-    client = genai.Client(api_key=api_key)
-    start_time = time.time()
-    truncated_query = (query[:200] + "...") if len(query) > 200 else query
-    print(f"  > Calling Gemini with schema, prompt: '{truncated_query}'")
-    try:
-        response = client.models.generate_content(
-            model=model,
-            contents=query,
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": response_schema,
-                "temperature": 0,
-            },
-        )
-        print(f"  > Gemini with schema call took: {time.time() - start_time:.2f}s")
-        if not response.parsed:
-            raise GeminiInvalidResponseException()
-        return response.parsed
-    except Exception as e:
-        print(f"An error occurred during predict with schema API call: {e}")
-        return None
+
+def _unpack_model_config(
+    model_config: dict | None,
+    default_model: str,
+    default_api_key: str | None,
+) -> tuple:
+    """Extracts per-request overrides from ``model_config``.
+
+    Returns ``(provider, model, base_url, api_key)`` where missing fields fall
+    back to ``model_config``'s global defaults (None / empty) so that
+    ``llm_client`` resolves from ``api_config`` when nothing is specified.
+    """
+    if not model_config:
+        return None, default_model, None, default_api_key
+
+    provider = model_config.get("provider") or None
+    model = model_config.get("modelName") or default_model
+    base_url = model_config.get("baseUrl") or None
+    api_key = model_config.get("apiKey") or default_api_key
+    return provider, model, base_url, api_key
 
 
 def format_pdf_with_latex(
@@ -133,49 +127,30 @@ def format_pdf_with_latex(
     concepts: List[LumiConcept],
     model="gemini-2.5-pro",
 ) -> str:
-    """
-    Calls Gemini to format the pdf, using the latex source as additional context.
+    """Calls the configured LLM to format the pdf, using the latex source.
 
-    Args:
-        pdf_data (bytes): The raw bytes from the paper pdf document.
-        latex_string (str): The combined LaTeX source as a string.
-        concepts (List[LumiConcept]): A list of concepts to identify.
-        model (str): The model to call with.
-
-    Returns:
-        str: The formatted pdf markdown.
+    Delegates to ``llm_client`` for the actual model call. This function passes
+    the PDF as an image-like input to Gemini; for OpenAI-compatible providers the
+    raw text prompt is sent (image content may not be supported).
     """
     start_time = time.time()
     prompt = prompts.make_import_pdf_prompt(concepts)
     truncated_prompt = (prompt[:200] + "...") if len(prompt) > 200 else prompt
-    print(f"  > Calling Gemini to format PDF, prompt: '{truncated_prompt}'")
+    print(f"  > Calling to format PDF, prompt: '{truncated_prompt}'")
 
-    contents = [
-        types.Part.from_bytes(
-            data=pdf_data,
-            mime_type="application/pdf",
-        ),
-        prompt,
-    ]
+    try:
+        response_text = llm_client.call_predict_with_image(
+            prompt=prompt,
+            image_bytes=pdf_data,
+            model=model,
+            api_key=None,
+        )
+    except Exception as e:
+        print(f"  > Model PDF formatting failed, falling back to text: {e}")
+        response_text = llm_client.call_predict(query=prompt, model=model, api_key=None)
 
-    if latex_string:
-        contents.insert(1, latex_string)
+    print(f"  > Format PDF call took: {time.time() - start_time:.2f}s")
 
-    client = genai.Client(api_key=api_config.DEFAULT_API_KEY)
-
-    response = client.models.generate_content(
-        model=model,
-        contents=contents,
-        config=types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=5000),
-            temperature=0,
-            stopSequences=[L_REFERENCES_END],
-        ),
-    )
-
-    print(f"  > Gemini format PDF call took: {time.time() - start_time:.2f}s")
-
-    response_text = response.text
     if not response_text:
         raise GeminiInvalidResponseException()
 

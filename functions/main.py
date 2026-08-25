@@ -553,6 +553,7 @@ def get_lumi_response(req: https_fn.CallableRequest) -> dict:
     doc_dict = req.data.get("doc")
     request_dict = req.data.get("request")
     api_key = req.data.get("apiKey")
+    model_config = req.data.get("modelConfig")
 
     if not doc_dict or not request_dict:
         raise https_fn.HttpsError(
@@ -583,7 +584,9 @@ def get_lumi_response(req: https_fn.CallableRequest) -> dict:
         )
 
     try:
-        lumi_answer = answers.generate_lumi_answer(doc, lumi_request, api_key)
+        lumi_answer = answers.generate_lumi_answer(
+            doc, lumi_request, api_key, model_config
+        )
     except exceptions.TooManyRequests as e:
         raise https_fn.HttpsError(
             https_fn.FunctionsErrorCode.RESOURCE_EXHAUSTED,
@@ -615,6 +618,7 @@ def get_personal_summary(req: https_fn.CallableRequest) -> dict:
     doc_dict = req.data.get("doc")
     past_papers_dict = req.data.get("past_papers")
     api_key = req.data.get("apiKey")
+    model_config = req.data.get("modelConfig")
 
     if not doc_dict or past_papers_dict is None:
         raise https_fn.HttpsError(
@@ -637,7 +641,9 @@ def get_personal_summary(req: https_fn.CallableRequest) -> dict:
     ]
 
     try:
-        summary = personal_summary.get_personal_summary(doc, past_papers, api_key)
+        summary = personal_summary.get_personal_summary(
+            doc, past_papers, api_key, model_config
+        )
     except exceptions.TooManyRequests as e:
         raise https_fn.HttpsError(
             https_fn.FunctionsErrorCode.RESOURCE_EXHAUSTED,

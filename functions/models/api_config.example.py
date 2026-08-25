@@ -13,5 +13,34 @@
 # limitations under the License.
 # ==============================================================================
 
-# TODO(developer): Add GEMINI API key.
+# AI model provider configuration.
+#
+# Supported providers:
+#   * "gemini"   - Google Gemini (default, uses the google-genai SDK)
+#   * "deepseek" - DeepSeek (OpenAI-compatible API)
+#   * "openai"   - OpenAI (OpenAI-compatible API)
+#
+# All values can be overridden via environment variables (LUMI_*), which is
+# the recommended approach for local development / CI.
+
+# One of: "gemini", "deepseek", "openai"
+MODEL_PROVIDER = "gemini"
+
+# Model name sent to the provider.
+#   Gemini: "gemini-2.5-flash", "gemini-2.5-pro"
+#   DeepSeek: "deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash-vision-exp"
+#             (the "-vision-exp" variant supports image input → keeps PDF formatting
+#              and figure-explanation working under DeepSeek)
+#   OpenAI: "gpt-4o", "gpt-4o-mini"
+MODEL_NAME = "gemini-2.5-flash"
+
+# Default model used for heavyweight tasks (PDF formatting / import).
+MODEL_NAME_STRONG = "gemini-2.5-pro"
+
+# API key. Gemini uses DEFAULT_API_KEY; OpenAI-compatible providers use their
+# own key (DeepSeek/OpenAI).
 DEFAULT_API_KEY = ""
+
+# Base URL. Only required for OpenAI-compatible providers when not using the
+# pre-filled defaults. For DeepSeek leave empty to use https://api.deepseek.com.
+BASE_URL = ""
