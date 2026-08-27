@@ -207,6 +207,10 @@ def convert_model_output_to_lumi_doc(
                     )
             lumi_abstract = LumiAbstract(contents=abstract_section.contents)
 
+    if lumi_abstract is None:
+        # Ensure callers/UI always receive a valid abstract object.
+        lumi_abstract = LumiAbstract(contents=[])
+
     lumi_sections = []
     if parsed_data.get("content"):
         # Extract equations before markdown conversion
@@ -251,6 +255,8 @@ def convert_model_output_to_lumi_doc(
                     )
                 )
 
+    _ensure_parsed_document_has_content(lumi_abstract, lumi_sections)
+
     return LumiDoc(
         markdown="",
         abstract=lumi_abstract,
@@ -259,6 +265,18 @@ def convert_model_output_to_lumi_doc(
         footnotes=lumi_footnotes,
         concepts=concepts,
     )
+
+
+def _ensure_parsed_document_has_content(
+    abstract: LumiAbstract | None, sections: list
+) -> None:
+    has_abstract = bool(abstract and abstract.contents)
+    has_sections = bool(sections)
+    if not has_abstract and not has_sections:
+        raise ValueError(
+            "Model import output did not contain a parseable abstract or body "
+            "(missing [[l-abs]] / [[l-con]] tagged content)."
+        )
 
 
 def preprocess_and_replace_figures(

@@ -108,8 +108,10 @@ DOCUMENT_REQUESTED_FUNCTION_TIMEOUT = 540
 DOCUMENT_REQUESTED_FUNCTION_TIMEOUT_BUFFER = 10
 
 RELOAD_ERROR_STATES = [
+    LoadingStatus.ERROR_DOCUMENT_LOAD,
     LoadingStatus.ERROR_DOCUMENT_LOAD_INVALID_RESPONSE,
     LoadingStatus.ERROR_DOCUMENT_LOAD_QUOTA_EXCEEDED,
+    LoadingStatus.ERROR_SUMMARIZING,
     LoadingStatus.ERROR_SUMMARIZING_INVALID_RESPONSE,
     LoadingStatus.ERROR_SUMMARIZING_QUOTA_EXCEEDED,
 ]
@@ -363,7 +365,7 @@ def _add_summaries_to_lumi_doc(versioned_doc_ref, doc_data):
     versioned_doc_ref.update(lumi_doc_json)
 
 
-@https_fn.on_call(memory=options.MemoryOption.MB_512)
+@https_fn.on_call(timeout_sec=180, memory=options.MemoryOption.MB_512)
 def request_arxiv_doc_import(req: https_fn.CallableRequest) -> dict:
     """
     Requests the import for a given arxiv doc, after requesting its metadata.
@@ -457,7 +459,22 @@ def _try_doc_write(metadata: ArxivMetadata, test_config: dict | None = None):
                     https_fn.FunctionsErrorCode.DEADLINE_EXCEEDED,
                     "This paper cannot be loaded (time limit exceeded)",
                 )
-            if loading_status not in RELOAD_ERROR_STATES:
+            # Allow reload for known recoverable errors, empty "success" docs,
+            # and stuck WAITING imports (e.g. emulator restart mid-import).
+            sections = lumi_doc.get("sections") or []
+            abstract = lumi_doc.get("abstract")
+            abstract_contents = (abstract or {}).get("contents") if abstract else None
+            # Allow reload when SUCCESS but body sections are missing (DeepSeek
+            # imports sometimes only parse the abstract).
+            is_empty_success = (
+                loading_status == LoadingStatus.SUCCESS and not sections
+            )
+            is_stuck_waiting = loading_status == LoadingStatus.WAITING
+            if (
+                loading_status not in RELOAD_ERROR_STATES
+                and not is_empty_success
+                and not is_stuck_waiting
+            ):
                 return
 
         doc_data = {

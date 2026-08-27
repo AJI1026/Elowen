@@ -34,6 +34,10 @@ T = TypeVar("T")
 
 API_KEY_LOGGING_MESSAGE = "Ran with user-specified API key"
 QUERY_RESPONSE_MAX_OUTPUT_TOKENS = 4000
+# Import needs room for both reasoning (if enabled) and final tagged markdown.
+IMPORT_MAX_OUTPUT_TOKENS = 65536
+# Keep latex payloads within practical provider context limits.
+IMPORT_MAX_LATEX_CHARS = 40000
 
 
 class LLMInvalidResponseException(Exception):
@@ -78,16 +82,27 @@ def call_predict(
     api_key: str | None = None,
     provider: str | None = None,
     base_url: str | None = None,
+    strong: bool = False,
+    max_output_tokens: int | None = None,
+    disable_thinking: bool = False,
 ) -> str:
     """Generate text from a plain-text prompt."""
     provider = _resolve_provider(provider)
     key = _resolve_api_key(api_key)
-    model = model or _pick_model(provider)
+    model = _resolve_model(provider, model, strong=strong)
     base_url = _resolve_base_url(provider, base_url)
+    max_tokens = max_output_tokens or QUERY_RESPONSE_MAX_OUTPUT_TOKENS
 
     if provider == "gemini":
-        return _gemini_text(query, model, key)
-    return _openai_text(query, model, key, base_url)
+        return _gemini_text(query, model, key, max_tokens=max_tokens)
+    return _openai_text(
+        query,
+        model,
+        key,
+        base_url,
+        max_tokens=max_tokens,
+        disable_thinking=disable_thinking,
+    )
 
 
 def call_predict_with_image(
@@ -97,11 +112,12 @@ def call_predict_with_image(
     api_key: str | None = None,
     provider: str | None = None,
     base_url: str | None = None,
+    strong: bool = False,
 ) -> str:
     """Generate text from a prompt plus a PNG image."""
     provider = _resolve_provider(provider)
     key = _resolve_api_key(api_key)
-    model = model or _pick_model(provider)
+    model = _resolve_model(provider, model, strong=strong)
     base_url = _resolve_base_url(provider, base_url)
 
     truncated_query = (prompt[:200] + "...") if len(prompt) > 200 else prompt
@@ -123,11 +139,12 @@ def call_predict_with_schema(
     api_key: str | None = None,
     provider: str | None = None,
     base_url: str | None = None,
+    strong: bool = False,
 ) -> T | List[T] | None:
     """Generate structured (JSON) output constrained by ``response_schema``."""
     provider = _resolve_provider(provider)
     key = _resolve_api_key(api_key)
-    model = model or _pick_model(provider)
+    model = _resolve_model(provider, model, strong=strong)
     base_url = _resolve_base_url(provider, base_url)
 
     start_time = time.time()
@@ -146,16 +163,58 @@ def call_predict_with_schema(
         return None
 
 
-def _pick_model(provider: str | None = None) -> str:
-    """Choose a default model based on provider."""
-    provider = _resolve_provider(provider)
-    return api_config.MODEL_NAME
+def _model_matches_provider(provider: str, model: str) -> bool:
+    """True when ``model`` looks compatible with ``provider``."""
+    name = model.strip().lower()
+    if provider == "gemini":
+        return name.startswith("gemini")
+    if provider == "deepseek":
+        return name.startswith("deepseek")
+    if provider == "openai":
+        return name.startswith("gpt-") or name.startswith("o1") or name.startswith("o3")
+    return True
+
+
+def _resolve_model(
+    provider: str, model: str | None, *, strong: bool = False
+) -> str:
+    """Pick a model name that matches the active provider.
+
+    Hardcoded Gemini defaults from older call sites are ignored when the
+    configured provider is DeepSeek/OpenAI (and vice versa).
+    """
+    if model and _model_matches_provider(provider, model):
+        return model
+
+    if strong and api_config.MODEL_NAME_STRONG:
+        strong_model = api_config.MODEL_NAME_STRONG
+        if _model_matches_provider(provider, strong_model):
+            return strong_model
+
+    if api_config.MODEL_NAME and _model_matches_provider(
+        provider, api_config.MODEL_NAME
+    ):
+        return api_config.MODEL_NAME
+
+    # Last resort: provider-safe built-in defaults (never cross-provider).
+    defaults = {
+        "gemini": ("gemini-2.5-flash", "gemini-2.5-pro"),
+        "deepseek": (
+            "deepseek-v4-flash-vision-exp",
+            "deepseek-v4-flash-vision-exp",
+        ),
+        "openai": ("gpt-4o-mini", "gpt-4o"),
+    }
+    normal, heavy = defaults.get(provider, defaults["gemini"])
+    return heavy if strong else normal
 
 
 # -----------------------------------------------------------------------------
 # Gemini backend (google-genai SDK)
 # -----------------------------------------------------------------------------
-def _gemini_text(query: str, model: str, api_key: str) -> str:
+def _gemini_text(
+    query: str, model: str, api_key: str, max_tokens: int = QUERY_RESPONSE_MAX_OUTPUT_TOKENS
+) -> str:
     from google import genai
     from google.genai import types
 
@@ -164,7 +223,7 @@ def _gemini_text(query: str, model: str, api_key: str) -> str:
         model=model,
         contents=query,
         config=types.GenerateContentConfig(
-            temperature=0, max_output_tokens=QUERY_RESPONSE_MAX_OUTPUT_TOKENS
+            temperature=0, max_output_tokens=max_tokens
         ),
     )
     if not response.text:
@@ -260,26 +319,78 @@ def _b64encode(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-def _openai_text(query: str, model: str, api_key: str, base_url: str) -> str:
+def _openai_text(
+    query: str,
+    model: str,
+    api_key: str,
+    base_url: str,
+    max_tokens: int = QUERY_RESPONSE_MAX_OUTPUT_TOKENS,
+    disable_thinking: bool = False,
+) -> str:
     from openai import OpenAI
 
     client = OpenAI(api_key=api_key, base_url=base_url)
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
+    create_kwargs = {
+        "model": model,
+        "messages": [
             {
                 "role": "system",
-                "content": "You are Lumi, a helpful research-paper reading assistant.",
+                "content": (
+                    "You are Lumi, a helpful research-paper reading assistant. "
+                    "Follow the output tag format exactly. Do not include chain-of-thought."
+                ),
             },
             {"role": "user", "content": query},
         ],
-        temperature=0,
-        max_tokens=QUERY_RESPONSE_MAX_OUTPUT_TOKENS,
-    )
-    text = response.choices[0].message.content
+        "temperature": 0,
+        "max_tokens": max_tokens,
+    }
+    # DeepSeek V4 reasoning can consume the entire max_tokens budget in
+    # reasoning_content and return empty content (finish_reason=length).
+    if disable_thinking:
+        create_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+
+    response = client.chat.completions.create(**create_kwargs)
+    choice = response.choices[0] if response.choices else None
+    message = choice.message if choice else None
+    text = _extract_message_text(message)
     if not text:
-        raise LLMInvalidResponseException()
+        finish = getattr(choice, "finish_reason", None) if choice else None
+        usage = getattr(response, "usage", None)
+        print(
+            f"  > Empty model response (finish_reason={finish!r}, usage={usage!r})"
+        )
+        raise LLMInvalidResponseException(
+            f"Empty model response (finish_reason={finish})"
+        )
     return text
+
+
+def _extract_message_text(message) -> str:
+    if message is None:
+        return ""
+    content = getattr(message, "content", None)
+    if isinstance(content, str) and content.strip():
+        return content
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, dict) and part.get("type") == "text":
+                parts.append(part.get("text") or "")
+            else:
+                text = getattr(part, "text", None)
+                if text:
+                    parts.append(text)
+        joined = "".join(parts).strip()
+        if joined:
+            return joined
+    # Last resort: some gateways only populate reasoning when budget is exhausted.
+    for attr in ("reasoning_content", "reasoning"):
+        reasoning = getattr(message, attr, None)
+        if isinstance(reasoning, str) and reasoning.strip():
+            print(f"  > Falling back to {attr} because content was empty")
+            return reasoning
+    return ""
 
 
 def _openai_schema(

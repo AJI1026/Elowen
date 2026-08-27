@@ -249,7 +249,7 @@ export const LOADING_STATUS_ERROR_STATES = [
 
 export interface LumiDoc {
   markdown: string;
-  abstract: LumiAbstract;
+  abstract?: LumiAbstract | null;
   sections: LumiSection[];
   concepts: LumiConcept[];
   summaries?: LumiSummaries;

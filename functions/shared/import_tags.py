@@ -90,7 +90,11 @@ L_ABSTRACT_PATTERN = re.compile(
     rf"{re.escape(L_ABSTRACT_START)}(.*?){re.escape(L_ABSTRACT_END)}", re.DOTALL
 )
 L_CONTENT_PATTERN = re.compile(
-    rf"{re.escape(L_CONTENT_START)}(.*?){re.escape(L_CONTENT_END)}", re.DOTALL
+    # Greedy match: first [[l-con]] through the last [[l-con]]. Non-greedy
+    # matching often captures an empty/short block when the model emits an
+    # extra early closing tag (common with DeepSeek/OpenAI outputs).
+    rf"{re.escape(L_CONTENT_START)}(.*){re.escape(L_CONTENT_END)}",
+    re.DOTALL,
 )
 L_REFERENCES_PATTERN = re.compile(
     rf"{re.escape(L_REFERENCES_START)}(.*?){re.escape(L_REFERENCES_END)}", re.DOTALL

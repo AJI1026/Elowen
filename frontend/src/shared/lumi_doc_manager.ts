@@ -103,22 +103,24 @@ export class LumiDocManager {
   }
 
   private initializeMaps(lumiDoc: LumiDoc) {
-    // Index spans in the abstract
-    lumiDoc.abstract.contents.forEach((content) => {
+    // Index spans in the abstract (may be missing if import model omitted it)
+    lumiDoc.abstract?.contents?.forEach((content) => {
       this.addContentSpans(content);
     });
 
     // Index spans in sections
-    lumiDoc.sections.forEach((section) => {
+    (lumiDoc.sections ?? []).forEach((section) => {
       this.addSectionSpans(section);
     });
 
     // Index spans in references
-    lumiDoc.references.forEach((reference) => {
-      this.spanMap.set(reference.span.id, reference.span);
+    (lumiDoc.references ?? []).forEach((reference) => {
+      if (reference?.span?.id) {
+        this.spanMap.set(reference.span.id, reference.span);
+      }
     });
 
-    lumiDoc.concepts.forEach((concept) => {
+    (lumiDoc.concepts ?? []).forEach((concept) => {
       this.conceptMap.set(concept.id, concept);
     });
   }
@@ -127,7 +129,7 @@ export class LumiDocManager {
     if (parent) {
       this.sectionToParentMap.set(section.id, parent);
     }
-    section.contents.forEach((content) => {
+    (section.contents ?? []).forEach((content) => {
       this.addContentSpans(content, section);
     });
 

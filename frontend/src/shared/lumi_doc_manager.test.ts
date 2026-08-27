@@ -261,4 +261,18 @@ describe("LumiDocManager", () => {
       expect(manager.getParentSection("non-existent-section")).to.be.undefined;
     });
   });
+
+  it("should tolerate a missing abstract without throwing", () => {
+    const span = createSpan("sec-span", "Body");
+    const doc = createDoc(
+      [],
+      [createSection("sec-1", [createTextContent([span])])],
+      []
+    );
+    // Simulate Firestore/import docs where abstract was omitted.
+    (doc as { abstract: null }).abstract = null;
+
+    const manager = new LumiDocManager(doc);
+    expect(manager.getSpanById("sec-span")).to.deep.equal(span);
+  });
 });

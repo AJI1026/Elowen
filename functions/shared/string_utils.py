@@ -16,6 +16,7 @@
 import re
 
 _ARXIV_ID_PREFIX = "http://arxiv.org/abs/"
+_ARXIV_ID_PREFIX_HTTPS = "https://arxiv.org/abs/"
 _ID_VERSION_DELIMETER = "v"
 
 
@@ -45,10 +46,12 @@ def get_id_and_version(versioned_id):
 
 
 def get_arxiv_versioned_id(metadata_id_link: str):
-    if not metadata_id_link.startswith(_ARXIV_ID_PREFIX):
-        raise ValueError("Invalid arxiv link")
+    if metadata_id_link.startswith(_ARXIV_ID_PREFIX_HTTPS):
+        return metadata_id_link[len(_ARXIV_ID_PREFIX_HTTPS) :]
+    if metadata_id_link.startswith(_ARXIV_ID_PREFIX):
+        return metadata_id_link[len(_ARXIV_ID_PREFIX) :]
 
-    return metadata_id_link[len(_ARXIV_ID_PREFIX) :]
+    raise ValueError("Invalid arxiv link")
 
 
 def extract_json_from_decorator(text: str) -> str:

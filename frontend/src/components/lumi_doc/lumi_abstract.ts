@@ -76,6 +76,9 @@ export class LumiAbstractViz extends LightMobxLitElement {
 
   private updateHighlightsMap() {
     this.highlightsMap.clear();
+    if (!this.abstract?.contents) {
+      return;
+    }
 
     this.abstract.contents.map((content) => {
       content.textContent?.spans.map((span) => {
@@ -97,6 +100,9 @@ export class LumiAbstractViz extends LightMobxLitElement {
   }
 
   override render() {
+    if (!this.abstract?.contents) {
+      return nothing;
+    }
     return html`
       <style>
         ${styles}

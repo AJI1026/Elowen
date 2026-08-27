@@ -43,6 +43,42 @@ KATEX_SUBSTITUTIONS: List[KatexSubstitution] = [
 ]
 
 
+def _fallback_extract_content(model_output_string: str, parsed_data: dict) -> str:
+    """Best-effort body extraction when [[l-con]] tags are missing/broken."""
+    text = model_output_string
+    start = 0
+    abs_match = import_tags.L_ABSTRACT_PATTERN.search(text)
+    if abs_match:
+        start = abs_match.end()
+    else:
+        # Prefer content after the first heading-like markdown line.
+        heading = re.search(r"\n#\s+", text)
+        if heading:
+            start = heading.start() + 1
+
+    end = len(text)
+    for marker in (
+        import_tags.L_REFERENCES_START,
+        import_tags.L_FOOTNOTES_START,
+        "[[l-refs-start]]",
+    ):
+        idx = text.find(marker, start)
+        if idx != -1:
+            end = min(end, idx)
+
+    candidate = text[start:end].strip()
+    # Drop leftover opening content tags if present.
+    if candidate.startswith(import_tags.L_CONTENT_START):
+        candidate = candidate[len(import_tags.L_CONTENT_START) :].strip()
+    if candidate.endswith(import_tags.L_CONTENT_END):
+        candidate = candidate[: -len(import_tags.L_CONTENT_END)].strip()
+
+    # Ignore tiny leftovers that are clearly not a paper body.
+    if len(candidate) < 200:
+        return ""
+    return candidate
+
+
 def parse_lumi_import(model_output_string: str) -> dict:
     """
     Parses a markdown string formatted with lumi-specific tags into a dictionary.
@@ -76,6 +112,13 @@ def parse_lumi_import(model_output_string: str) -> dict:
             parsed_data[key] = match.group(1).strip()
         # If a section is not found, the key is simply omitted from the dictionary,
         # which is often preferred over an empty string default.
+
+    # Fallback when the model omits/breaks [[l-con]] wrappers but still emits
+    # body text between abstract and references.
+    if not parsed_data.get("content"):
+        fallback = _fallback_extract_content(model_output_string, parsed_data)
+        if fallback:
+            parsed_data["content"] = fallback
 
     # Use re.finditer to get match objects, which allows accessing specific groups
     references_list = []

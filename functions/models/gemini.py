@@ -29,7 +29,13 @@ from models import api_config
 from models import prompts
 from models import llm_client
 from shared.lumi_doc import LumiConcept
-from shared.import_tags import L_REFERENCES_START, L_REFERENCES_END
+from shared.import_tags import (
+    L_REFERENCES_START,
+    L_REFERENCES_END,
+    L_CONTENT_START,
+    L_CONTENT_END,
+    L_FOOTNOTES_START,
+)
 
 API_KEY_LOGGING_MESSAGE = "Ran with user-specified API key"
 QUERY_RESPONSE_MAX_OUTPUT_TOKENS = 4000
@@ -43,7 +49,7 @@ class GeminiInvalidResponseException(Exception):
 
 def call_predict(
     query="The opposite of happy is",
-    model="gemini-2.5-flash",
+    model: str | None = None,
     api_key: str | None = None,
     model_config: dict | None = None,
 ) -> str:
@@ -65,7 +71,7 @@ def call_predict(
 def call_predict_with_image(
     prompt: str,
     image_bytes: bytes,
-    model="gemini-2.5-flash",
+    model: str | None = None,
     api_key: str | None = None,
     model_config: dict | None = None,
 ) -> str:
@@ -82,7 +88,7 @@ def call_predict_with_image(
 def call_predict_with_schema(
     query: str,
     response_schema: Type[T],
-    model="gemini-2.5-flash",
+    model: str | None = None,
     api_key: str | None = None,
     model_config: dict | None = None,
 ) -> T | List[T] | None:
@@ -102,7 +108,7 @@ def call_predict_with_schema(
 
 def _unpack_model_config(
     model_config: dict | None,
-    default_model: str,
+    default_model: str | None,
     default_api_key: str | None,
 ) -> tuple:
     """Extracts per-request overrides from ``model_config``.
@@ -125,35 +131,115 @@ def format_pdf_with_latex(
     pdf_data: bytes,
     latex_string: str,
     concepts: List[LumiConcept],
-    model="gemini-2.5-pro",
+    model: str | None = None,
 ) -> str:
     """Calls the configured LLM to format the pdf, using the latex source.
 
-    Delegates to ``llm_client`` for the actual model call. This function passes
-    the PDF as an image-like input to Gemini; for OpenAI-compatible providers the
-    raw text prompt is sent (image content may not be supported).
+    Gemini receives PDF bytes as multimodal input. OpenAI-compatible providers
+    (DeepSeek/OpenAI) cannot treat PDF bytes as a PNG image, so they receive the
+    LaTeX source embedded in the text prompt instead.
     """
     start_time = time.time()
     prompt = prompts.make_import_pdf_prompt(concepts)
     truncated_prompt = (prompt[:200] + "...") if len(prompt) > 200 else prompt
     print(f"  > Calling to format PDF, prompt: '{truncated_prompt}'")
 
-    try:
-        response_text = llm_client.call_predict_with_image(
-            prompt=prompt,
-            image_bytes=pdf_data,
-            model=model,
-            api_key=None,
+    # Prefer the configured strong model (e.g. deepseek-v4-flash-vision-exp).
+    model = model or api_config.MODEL_NAME_STRONG or api_config.MODEL_NAME
+    provider = (api_config.MODEL_PROVIDER or "gemini").strip().lower()
+
+    if provider == "gemini":
+        try:
+            response_text = llm_client.call_predict_with_image(
+                prompt=prompt,
+                image_bytes=pdf_data,
+                model=model,
+                api_key=None,
+                strong=True,
+            )
+        except Exception as e:
+            print(f"  > Model PDF formatting failed, falling back to text: {e}")
+            response_text = llm_client.call_predict(
+                query=_build_latex_import_query(prompt, latex_string),
+                model=model,
+                api_key=None,
+                strong=True,
+                max_output_tokens=llm_client.IMPORT_MAX_OUTPUT_TOKENS,
+            )
+    else:
+        # DeepSeek/OpenAI: latex text import. Prefer a non-vision flash model and
+        # disable thinking so reasoning cannot consume the whole token budget.
+        import_model = model
+        if provider == "deepseek" and "vision" in (model or "").lower():
+            import_model = "deepseek-v4-flash"
+            print(
+                f"  > Switching import model from {model!r} to {import_model!r} "
+                "(text-only latex conversion)"
+            )
+        print(
+            f"  > Using latex text import for provider={provider!r} "
+            f"(latex_chars={len(latex_string)}, model={import_model!r})"
         )
-    except Exception as e:
-        print(f"  > Model PDF formatting failed, falling back to text: {e}")
-        response_text = llm_client.call_predict(query=prompt, model=model, api_key=None)
+        try:
+            response_text = llm_client.call_predict(
+                query=_build_latex_import_query(prompt, latex_string),
+                model=import_model,
+                api_key=None,
+                strong=True,
+                max_output_tokens=llm_client.IMPORT_MAX_OUTPUT_TOKENS,
+                disable_thinking=True,
+            )
+        except llm_client.LLMInvalidResponseException as e:
+            print(f"  > Import call empty/invalid ({e}); retrying with truncated latex")
+            truncated = (latex_string or "")[:20000]
+            response_text = llm_client.call_predict(
+                query=_build_latex_import_query(prompt, truncated),
+                model=import_model,
+                api_key=None,
+                strong=True,
+                max_output_tokens=llm_client.IMPORT_MAX_OUTPUT_TOKENS,
+                disable_thinking=True,
+            )
 
     print(f"  > Format PDF call took: {time.time() - start_time:.2f}s")
+    print(f"  > Format PDF response chars: {len(response_text or '')}")
 
     if not response_text:
         raise GeminiInvalidResponseException()
 
     if L_REFERENCES_START in response_text and L_REFERENCES_END not in response_text:
         response_text += L_REFERENCES_END
+    # DeepSeek often emits an opening [[l-con]] without a matching closer before
+    # references; without this the body parses as empty.
+    if L_CONTENT_START in response_text:
+        first = response_text.find(L_CONTENT_START)
+        after = response_text[first + len(L_CONTENT_START) :]
+        if L_CONTENT_END not in after:
+            insert_at = response_text.find(L_REFERENCES_START)
+            if insert_at == -1:
+                insert_at = response_text.find(L_FOOTNOTES_START)
+            if insert_at == -1:
+                response_text += L_CONTENT_END
+            else:
+                response_text = (
+                    response_text[:insert_at]
+                    + L_CONTENT_END
+                    + "\n"
+                    + response_text[insert_at:]
+                )
     return response_text
+
+
+def _build_latex_import_query(prompt: str, latex_string: str) -> str:
+    latex = latex_string or ""
+    if len(latex) > llm_client.IMPORT_MAX_LATEX_CHARS:
+        latex = (
+            latex[: llm_client.IMPORT_MAX_LATEX_CHARS]
+            + "\n\n[LaTeX truncated for model context limits]\n"
+        )
+    return (
+        f"{prompt}\n\n"
+        "=== LaTeX source (use this as the primary content) ===\n"
+        f"{latex}\n"
+        "=== End LaTeX source ===\n"
+    )

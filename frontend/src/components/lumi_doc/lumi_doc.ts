@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { html } from "lit";
+import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { HighlightSelection } from "../../shared/selection_utils";
 
@@ -164,22 +164,24 @@ export class LumiDocViz extends LightMobxLitElement {
               ${this.lumiDoc.metadata?.authors.join(", ")}
             </div>
           </div>
-          <lumi-abstract
-            .abstract=${this.lumiDoc.abstract}
-            .isCollapsed=${this.collapseManager.isAbstractCollapsed}
-            .onCollapseChange=${(isCollapsed: boolean) => {
-              this.collapseManager.setAbstractCollapsed(isCollapsed);
-            }}
-            .onFootnoteClick=${this.onFootnoteClick.bind(this)}
-            .onConceptClick=${this.onConceptClick.bind(this)}
-            .excerptSpanId=${this.lumiDoc.summaries?.abstractExcerptSpanId}
-            .highlightManager=${this.highlightManager}
-            .answerHighlightManager=${this.answerHighlightManager}
-            .onAnswerHighlightClick=${this.onAnswerHighlightClick}
-            .footnotes=${this.lumiDoc.footnotes}
-          >
-          </lumi-abstract>
-          ${this.lumiDoc.sections.map((section) => {
+          ${this.lumiDoc.abstract
+            ? html`<lumi-abstract
+                .abstract=${this.lumiDoc.abstract}
+                .isCollapsed=${this.collapseManager.isAbstractCollapsed}
+                .onCollapseChange=${(isCollapsed: boolean) => {
+                  this.collapseManager.setAbstractCollapsed(isCollapsed);
+                }}
+                .onFootnoteClick=${this.onFootnoteClick.bind(this)}
+                .onConceptClick=${this.onConceptClick.bind(this)}
+                .excerptSpanId=${this.lumiDoc.summaries?.abstractExcerptSpanId}
+                .highlightManager=${this.highlightManager}
+                .answerHighlightManager=${this.answerHighlightManager}
+                .onAnswerHighlightClick=${this.onAnswerHighlightClick}
+                .footnotes=${this.lumiDoc.footnotes}
+              >
+              </lumi-abstract>`
+            : nothing}
+          ${(this.lumiDoc.sections ?? []).map((section) => {
             return html`<lumi-section
               .section=${section}
               .references=${this.lumiDoc.references}
