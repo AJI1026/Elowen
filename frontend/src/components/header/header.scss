@@ -64,11 +64,19 @@
     @include common.flex-row-align-center;
     gap: common.$spacing-small;
   }
+
+  .right {
+    gap: common.$spacing-medium;
+  }
 }
 
 h1 {
   @include typescale.title-large;
   margin: 0;
+
+  &.brand-title {
+    color: #4e8ff8;
+  }
 
   &.short {
     max-width: 200px;
@@ -120,5 +128,5 @@ pr-button {
 }
 
 .import-button-tooltip {
-  margin-left: common.$spacing-small;
+  margin-left: common.$spacing-medium;
 }

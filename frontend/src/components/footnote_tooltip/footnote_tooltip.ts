@@ -21,10 +21,10 @@ import { customElement, property } from "lit/decorators.js";
 import { FootnoteTooltipProps } from "../../services/floating_panel_service";
 import { styles } from "./footnote_tooltip.scss";
 
-import "../lumi_span/lumi_span";
+import "../elowen_span/elowen_span";
 
 /**
- * A tooltip component to display information about a LumiFootnote.
+ * A tooltip component to display information about a ElowenFootnote.
  */
 @customElement("footnote-tooltip")
 export class FootnoteTooltip extends MobxLitElement {
@@ -41,7 +41,7 @@ export class FootnoteTooltip extends MobxLitElement {
 
     return html`
       <div class="footnote-tooltip-component">
-        <lumi-span .span=${footnote.span}></lumi-span>
+        <elowen-span .span=${footnote.span}></elowen-span>
       </div>
     `;
   }

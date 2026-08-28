@@ -22,10 +22,10 @@ from dataclasses import dataclass
 from pydantic import BaseModel
 
 from shared.utils import get_unique_id
-from shared.lumi_doc import (
+from shared.elowen_doc import (
     ConceptContent,
-    LumiConcept,
-    LumiSpan,
+    ElowenConcept,
+    ElowenSpan,
     InnerTag,
     InnerTagName,
     Position,
@@ -47,21 +47,21 @@ class LLMResponseSchema(BaseModel):
     concepts: List[LLMExtractedConcept]
 
 
-def parse_lumi_concepts(parsed_llm_output: LLMResponseSchema) -> List[LumiConcept]:
+def parse_elowen_concepts(parsed_llm_output: LLMResponseSchema) -> List[ElowenConcept]:
     if not parsed_llm_output or not parsed_llm_output.concepts:
         return []
 
-    lumi_concepts: List[LumiConcept] = []
+    elowen_concepts: List[ElowenConcept] = []
     for i, concept_data in enumerate(parsed_llm_output.concepts):
-        lumi_concept = LumiConcept(
+        elowen_concept = ElowenConcept(
             id=f"concept-{i}",
             name=concept_data.name,
             contents=concept_data.contents,
             in_text_citations=[],
         )
-        lumi_concepts.append(lumi_concept)
+        elowen_concepts.append(elowen_concept)
 
-    return lumi_concepts
+    return elowen_concepts
 
 
 def extract_concepts(abstract: str):
@@ -72,7 +72,7 @@ def extract_concepts(abstract: str):
         abstract (str): The abstract text.
 
     Returns:
-        List[LumiConcept]: A list of LumiConcepts found in the abstract.
+        List[ElowenConcept]: A list of ElowenConcepts found in the abstract.
     """
 
     try:
@@ -85,9 +85,9 @@ def extract_concepts(abstract: str):
             print("LLM returned an empty or invalid response.")
             return []
 
-        lumi_concepts = parse_lumi_concepts(parsed_response)
+        elowen_concepts = parse_elowen_concepts(parsed_response)
 
-        return lumi_concepts
+        return elowen_concepts
 
     except Exception as e:
         print(f"An unexpected error occurred in extract_concepts: {e}")
@@ -95,17 +95,17 @@ def extract_concepts(abstract: str):
 
 
 def annotate_concepts_in_place(
-    spans: List[LumiSpan], concepts: List[LumiConcept]
-) -> List[LumiSpan]:
+    spans: List[ElowenSpan], concepts: List[ElowenConcept]
+) -> List[ElowenSpan]:
     """
-    Finds occurrences of concept names in LumiSpans and adds CONCEPT inner tags.
+    Finds occurrences of concept names in ElowenSpans and adds CONCEPT inner tags.
 
     Args:
-        spans: A list of LumiSpan objects to be annotated.
-        concepts: A list of LumiConcept objects to search for.
+        spans: A list of ElowenSpan objects to be annotated.
+        concepts: A list of ElowenConcept objects to search for.
 
     Returns:
-        The list of LumiSpan objects with added inner tags for concepts.
+        The list of ElowenSpan objects with added inner tags for concepts.
     """
     for span in spans:
         for concept in concepts:

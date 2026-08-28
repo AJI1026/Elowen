@@ -1,4 +1,4 @@
-# Lumi Storybook Stories
+# Elowen Storybook Stories
 
 For more information, see: [documentation](https://storybook.js.org/docs)
 

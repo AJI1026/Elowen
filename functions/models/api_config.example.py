@@ -13,34 +13,66 @@
 # limitations under the License.
 # ==============================================================================
 
-# AI model provider configuration.
+import os
+
+# ---------------------------------------------------------------------------
+# AI model provider configuration (server-side).
+#
+# Copy this file to api_config.py (gitignored) and set your key / provider:
+#   cp models/api_config.example.py models/api_config.py
 #
 # Supported providers:
 #   * "gemini"   - Google Gemini (default, uses the google-genai SDK)
 #   * "deepseek" - DeepSeek (OpenAI-compatible API)
 #   * "openai"   - OpenAI (OpenAI-compatible API)
 #
-# All values can be overridden via environment variables (LUMI_*), which is
-# the recommended approach for local development / CI.
+# Every value below can be overridden by an environment variable when you
+# start the Firebase emulator / functions (recommended for local / CI).
+# ---------------------------------------------------------------------------
 
-# One of: "gemini", "deepseek", "openai"
-MODEL_PROVIDER = "gemini"
+# Which provider to use. One of: "gemini", "deepseek", "openai".
+# Env: ELOWEN_MODEL_PROVIDER
+MODEL_PROVIDER = os.environ.get("ELOWEN_MODEL_PROVIDER", "gemini").strip().lower()
+
+# Default model names per provider. Used when ELOWEN_MODEL_NAME /
+# ELOWEN_MODEL_NAME_STRONG are unset so switching provider alone is enough.
+_PROVIDER_DEFAULT_MODELS = {
+    "gemini": ("gemini-2.5-flash", "gemini-2.5-pro"),
+    "deepseek": (
+        "deepseek-v4-flash-vision-exp",
+        "deepseek-v4-flash-vision-exp",
+    ),
+    "openai": ("gpt-4o-mini", "gpt-4o"),
+}
+
+_default_model, _default_strong = _PROVIDER_DEFAULT_MODELS.get(
+    MODEL_PROVIDER, _PROVIDER_DEFAULT_MODELS["gemini"]
+)
 
 # Model name sent to the provider.
 #   Gemini: "gemini-2.5-flash", "gemini-2.5-pro"
-#   DeepSeek: "deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash-vision-exp"
-#             (the "-vision-exp" variant supports image input → keeps PDF formatting
-#              and figure-explanation working under DeepSeek)
+#   DeepSeek: "deepseek-chat", "deepseek-reasoner",
+#             "deepseek-v4-flash-vision-exp" (vision → images / PDF formatting)
 #   OpenAI: "gpt-4o", "gpt-4o-mini"
-MODEL_NAME = "gemini-2.5-flash"
+# Env: ELOWEN_MODEL_NAME
+MODEL_NAME = os.environ.get("ELOWEN_MODEL_NAME", _default_model)
 
-# Default model used for heavyweight tasks (PDF formatting / import).
-MODEL_NAME_STRONG = "gemini-2.5-pro"
+# Heavyweight tasks (PDF formatting / import).
+# Env: ELOWEN_MODEL_NAME_STRONG
+MODEL_NAME_STRONG = os.environ.get("ELOWEN_MODEL_NAME_STRONG", _default_strong)
 
-# API key. Gemini uses DEFAULT_API_KEY; OpenAI-compatible providers use their
-# own key (DeepSeek/OpenAI).
-DEFAULT_API_KEY = ""
+# Server API key used for paper import and other backend LLM calls.
+# Prefer setting ELOWEN_API_KEY in the environment; or paste a default here.
+# Env: ELOWEN_API_KEY
+DEFAULT_API_KEY = os.environ.get("ELOWEN_API_KEY", "")
 
-# Base URL. Only required for OpenAI-compatible providers when not using the
-# pre-filled defaults. For DeepSeek leave empty to use https://api.deepseek.com.
-BASE_URL = ""
+# Base URL for OpenAI-compatible providers. Leave empty to use the defaults
+# in DEFAULT_BASE_URLS (DeepSeek → https://api.deepseek.com).
+# Env: ELOWEN_BASE_URL
+BASE_URL = os.environ.get("ELOWEN_BASE_URL", "")
+
+DEFAULT_BASE_URLS = {
+    "gemini": "",
+    "deepseek": "https://api.deepseek.com",
+    "openai": "https://api.openai.com/v1",
+}

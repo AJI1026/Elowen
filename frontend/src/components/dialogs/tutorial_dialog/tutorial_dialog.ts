@@ -17,7 +17,6 @@
 
 import "../../../pair-components/dialog";
 import "../../../pair-components/button";
-import "../../lumi_image/lumi_image";
 
 import { MobxLitElement } from "@adobe/lit-mobx";
 import { CSSResultGroup, html, nothing } from "lit";
@@ -30,11 +29,12 @@ import {
 } from "../../../services/dialog.service";
 import { styles } from "./tutorial_dialog.scss";
 import {
+  staticAssetUrl,
   TUTORIAL_IMAGE_QUESTION_IMAGE_PATH,
   TUTORIAL_QUESTION_IMAGE_PATH,
 } from "../../../shared/constants";
-import { FirebaseService } from "../../../services/firebase.service";
 import { SettingsService } from "../../../services/settings.service";
+import { t } from "../../../shared/i18n";
 
 /**
  * The tutorial dialog component.
@@ -44,8 +44,11 @@ export class TutorialDialog extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
   private readonly dialogService = core.getService(DialogService);
-  private readonly firebaseService = core.getService(FirebaseService);
   private readonly settingsService = core.getService(SettingsService);
+
+  private uiLang() {
+    return this.settingsService.responseLanguage.value;
+  }
 
   private handleClose() {
     if (this.dialogService) {
@@ -55,10 +58,6 @@ export class TutorialDialog extends MobxLitElement {
 
   private shouldShowDialog() {
     return this.dialogService.dialogProps instanceof TutorialDialogProps;
-  }
-
-  private getImageUrl(path: string) {
-    return this.firebaseService.getDownloadUrl(path);
   }
 
   private renderHideForeverButton() {
@@ -78,35 +77,57 @@ export class TutorialDialog extends MobxLitElement {
         this.handleClose();
       }}
     >
-      Don't show again
+      ${t("tutorial.dontShowAgain", this.uiLang())}
     </pr-button>`;
   }
 
+  private renderTipList() {
+    const lang = this.uiLang();
+    const tips = [
+      "tutorial.tipExplain",
+      "tutorial.tipAsk",
+      "tutorial.tipMindmap",
+      "tutorial.tipNotes",
+      "tutorial.tipGuide",
+    ] as const;
+
+    return html`<ul class="tip-list">
+      ${tips.map((key) => html`<li>${t(key, lang)}</li>`)}
+    </ul>`;
+  }
+
   override render() {
+    const lang = this.uiLang();
+
     return html`
       <pr-dialog
         .onClose=${() => {
-          this.handleClose;
+          this.handleClose();
         }}
         .showDialog=${this.shouldShowDialog()}
       >
-        <div slot="title">✨ Tip: Ask Lumi</div>
-        <div>
-          <p class="dialog-explanation">
-            Try selecting some text or clicking an image:
-          </p>
+        <div slot="title">${t("tutorial.title", lang)}</div>
+        <div class="tutorial-body">
+          <p class="dialog-explanation">${t("tutorial.intro", lang)}</p>
           <div class="images">
-            <lumi-image
-              class="tutorial-image"
-              .storagePath=${TUTORIAL_QUESTION_IMAGE_PATH}
-              .getImageUrl=${this.getImageUrl.bind(this)}
-            ></lumi-image>
-            <lumi-image
-              class="tutorial-image"
-              .storagePath=${TUTORIAL_IMAGE_QUESTION_IMAGE_PATH}
-              .getImageUrl=${this.getImageUrl.bind(this)}
-            ></lumi-image>
+            <figure class="tutorial-figure">
+              <img
+                class="tutorial-image"
+                src=${staticAssetUrl(TUTORIAL_QUESTION_IMAGE_PATH)}
+                alt=${t("tutorial.captionSelect", lang)}
+              />
+              <figcaption>${t("tutorial.captionSelect", lang)}</figcaption>
+            </figure>
+            <figure class="tutorial-figure">
+              <img
+                class="tutorial-image"
+                src=${staticAssetUrl(TUTORIAL_IMAGE_QUESTION_IMAGE_PATH)}
+                alt=${t("tutorial.captionImage", lang)}
+              />
+              <figcaption>${t("tutorial.captionImage", lang)}</figcaption>
+            </figure>
           </div>
+          ${this.renderTipList()}
         </div>
         <div slot="actions-right" class="actions">
           ${this.renderHideForeverButton()}
@@ -115,7 +136,7 @@ export class TutorialDialog extends MobxLitElement {
               this.handleClose();
             }}
           >
-            Got it!
+            ${t("tutorial.gotIt", lang)}
           </pr-button>
         </div>
       </pr-dialog>

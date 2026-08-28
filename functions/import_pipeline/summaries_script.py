@@ -25,46 +25,46 @@ script_dir = os.path.dirname(__file__)
 project_root = os.path.abspath(os.path.join(script_dir, ".."))
 sys.path.insert(0, project_root)
 
-from shared.lumi_doc import (
-    LumiDoc,
-    LumiSpan,
-    LumiSection,
-    LumiContent,
+from shared.elowen_doc import (
+    ElowenDoc,
+    ElowenSpan,
+    ElowenSection,
+    ElowenContent,
     TextContent,
     Heading,
-    LumiSummaries,
+    ElowenSummaries,
     Label,
-    LumiAbstract,
+    ElowenAbstract,
 )
 from import_pipeline.summaries import (
-    generate_lumi_summaries,
-    FetchLumiSummariesRequestOptions,
+    generate_elowen_summaries,
+    FetchElowenSummariesRequestOptions,
 )
 
 
-def create_dummy_lumi_doc() -> LumiDoc:
+def create_dummy_elowen_doc() -> ElowenDoc:
     """
-    Creates a dummy LumiDoc with one section, one text content, and three spans (sentences).
+    Creates a dummy ElowenDoc with one section, one text content, and three spans (sentences).
     Sentences are designed to be easily parsable and long enough for summarization.
     """
-    # Create LumiSpan objects for the main content
+    # Create ElowenSpan objects for the main content
 
-    span1 = LumiSpan(
+    span1 = ElowenSpan(
         id="span_id_1",
         text="This is the first sentence of our document, containing important information about cats.",
         inner_tags=[],
     )
-    span2 = LumiSpan(
+    span2 = ElowenSpan(
         id="span_id_2",
         text="It's important to know that cats are obligatory carnivores.",
         inner_tags=[],
     )
-    span3 = LumiSpan(
+    span3 = ElowenSpan(
         id="span_id_3",
         text="This sentence includes an equation $E=mc^2$ to test math handling.",
         inner_tags=[],
     )
-    span4 = LumiSpan(
+    span4 = ElowenSpan(
         id="span_id_4",
         text="Finally, the fourth sentence concludes this initial thought with a summary.",
         inner_tags=[],
@@ -73,73 +73,73 @@ def create_dummy_lumi_doc() -> LumiDoc:
     # Create TextContent
     text_content = TextContent(tag_name="p", spans=[span1, span2, span3, span4])
 
-    # Create LumiContent
-    lumi_content = LumiContent(id="main_content_id", text_content=text_content)
+    # Create ElowenContent
+    elowen_content = ElowenContent(id="main_content_id", text_content=text_content)
 
     # Create Heading
     heading = Heading(heading_level=2, text="Introduction to Dummy Document")
 
     # Create nested section for testing
     nested_span_id = "nested_span_id"
-    nested_span = LumiSpan(
+    nested_span = ElowenSpan(
         id=nested_span_id,
         text="This is a sentence within a nested subsection. Need to make it longer so it exceeds the min character length...",
         inner_tags=[],
     )
     nested_text_content = TextContent(tag_name="p", spans=[nested_span])
-    nested_lumi_content_id = "nested_content_id"
-    nested_lumi_content = LumiContent(
-        id=nested_lumi_content_id, text_content=nested_text_content
+    nested_elowen_content_id = "nested_content_id"
+    nested_elowen_content = ElowenContent(
+        id=nested_elowen_content_id, text_content=nested_text_content
     )
     nested_heading = Heading(heading_level=3, text="Nested Subsection")
     nested_section_id = "section_id"
-    nested_section = LumiSection(
+    nested_section = ElowenSection(
         id=nested_section_id,
         heading=nested_heading,
-        contents=[nested_lumi_content],
+        contents=[nested_elowen_content],
         sub_sections=[],
     )
 
-    # Create LumiSection
-    lumi_section = LumiSection(
+    # Create ElowenSection
+    elowen_section = ElowenSection(
         id="main_section_id",
         heading=heading,
-        contents=[lumi_content],
+        contents=[elowen_content],
         sub_sections=[nested_section],
     )
 
-    # Create LumiAbstract
+    # Create ElowenAbstract
     abstract_spans = [
-        LumiSpan(
+        ElowenSpan(
             id="abs_span_1_id",
             text="This is the dummy abstract's first sentence.",
             inner_tags=[],
         ),
-        LumiSpan(
+        ElowenSpan(
             id="abs_span_2_id",
             text="This second sentence is the most important one for the abstract excerpt.",
             inner_tags=[],
         ),
     ]
-    abstract_content = LumiContent(
+    abstract_content = ElowenContent(
         id="abs_content_id",
         text_content=TextContent(tag_name="p", spans=abstract_spans),
     )
-    lumi_abstract = LumiAbstract(contents=[abstract_content])
+    elowen_abstract = ElowenAbstract(contents=[abstract_content])
 
-    # Create LumiDoc
-    dummy_doc = LumiDoc(
+    # Create ElowenDoc
+    dummy_doc = ElowenDoc(
         markdown="",
-        sections=[lumi_section],
+        sections=[elowen_section],
         concepts=[],
-        abstract=lumi_abstract,
+        abstract=elowen_abstract,
     )
     return dummy_doc
 
 
-def print_lumi_summaries(summaries: LumiSummaries):
-    """Prints the components of a LumiSummaries object in a readable format."""
-    print("\n--- Lumi Summaries Output ---")
+def print_elowen_summaries(summaries: ElowenSummaries):
+    """Prints the components of a ElowenSummaries object in a readable format."""
+    print("\n--- Elowen Summaries Output ---")
 
     print("Abstract Excerpt Span ID:", summaries.abstract_excerpt_span_id)
 
@@ -171,12 +171,12 @@ def print_lumi_summaries(summaries: LumiSummaries):
 
 
 if __name__ == "__main__":
-    print("Creating dummy LumiDoc...")
-    dummy_doc = create_dummy_lumi_doc()
-    print("Dummy LumiDoc created successfully.")
+    print("Creating dummy ElowenDoc...")
+    dummy_doc = create_dummy_elowen_doc()
+    print("Dummy ElowenDoc created successfully.")
 
     print("Configuring summarization options...")
-    options = FetchLumiSummariesRequestOptions(
+    options = FetchElowenSummariesRequestOptions(
         include_section_summaries=True,
         include_content_summaries=True,
         include_span_summaries=True,
@@ -184,9 +184,9 @@ if __name__ == "__main__":
     )
     print("Summarization options configured.")
 
-    print("Generating Lumi summaries (this calls the Gemini API)...")
-    lumi_summaries_result = generate_lumi_summaries(dummy_doc, options)
-    print("Lumi summaries generated.")
+    print("Generating Elowen summaries (this calls the Gemini API)...")
+    elowen_summaries_result = generate_elowen_summaries(dummy_doc, options)
+    print("Elowen summaries generated.")
 
     print("Printing generated summaries:")
-    print_lumi_summaries(lumi_summaries_result)
+    print_elowen_summaries(elowen_summaries_result)

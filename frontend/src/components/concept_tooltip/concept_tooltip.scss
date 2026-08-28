@@ -18,7 +18,7 @@
 @use "../../sass/typescale";
 
 :host {
-  max-width: 300px;
+  max-width: 360px;
 }
 
 .concept-tooltip-component {
@@ -27,9 +27,22 @@
   gap: common.$spacing-medium;
   padding: common.$spacing-large;
 
-  max-width: 300px;
+  max-width: 360px;
 }
 
 .concept-name {
-  @include typescale.label-medium;
+  @include typescale.title-small;
+  font-weight: 600;
 }
+
+.loading {
+  @include common.flex-row-align-center;
+  justify-content: center;
+  padding: common.$spacing-medium 0;
+}
+
+.fallback-note {
+  @include typescale.body-small;
+  color: var(--md-sys-color-on-surface-variant);
+}
+

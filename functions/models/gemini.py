@@ -19,7 +19,7 @@ Kept under the ``gemini`` module name so existing call sites
 (``from models import gemini``) and tests (``@patch('...gemini...')``) continue
 to work. The default model names default to Gemini, but the actual provider
 (and model) is resolved from :mod:`models.api_config` — switchable to DeepSeek /
-OpenAI via ``LUMI_MODEL_PROVIDER`` etc.
+OpenAI via ``ELOWEN_MODEL_PROVIDER`` etc.
 """
 
 import time
@@ -28,7 +28,7 @@ from typing import List, Type, TypeVar
 from models import api_config
 from models import prompts
 from models import llm_client
-from shared.lumi_doc import LumiConcept
+from shared.elowen_doc import ElowenConcept
 from shared.import_tags import (
     L_REFERENCES_START,
     L_REFERENCES_END,
@@ -130,7 +130,7 @@ def _unpack_model_config(
 def format_pdf_with_latex(
     pdf_data: bytes,
     latex_string: str,
-    concepts: List[LumiConcept],
+    concepts: List[ElowenConcept],
     model: str | None = None,
 ) -> str:
     """Calls the configured LLM to format the pdf, using the latex source.

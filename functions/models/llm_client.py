@@ -59,7 +59,7 @@ def _resolve_provider(override: str | None = None) -> str:
     provider = (override or api_config.MODEL_PROVIDER or "gemini").strip().lower()
     if provider not in {"gemini", "deepseek", "openai"}:
         raise UnsupportedProviderError(
-            f"Unsupported LUMI_MODEL_PROVIDER: {provider!r}. "
+            f"Unsupported ELOWEN_MODEL_PROVIDER: {provider!r}. "
             "Expected one of: gemini, deepseek, openai."
         )
     return provider
@@ -289,7 +289,7 @@ def _openai_image(prompt: str, image_bytes: bytes, model: str, api_key: str, bas
         messages=[
             {
                 "role": "system",
-                "content": "You are Lumi, a helpful research-paper reading assistant.",
+                "content": "You are Elowen, a helpful research-paper reading assistant.",
             },
             {
                 "role": "user",
@@ -336,7 +336,7 @@ def _openai_text(
             {
                 "role": "system",
                 "content": (
-                    "You are Lumi, a helpful research-paper reading assistant. "
+                    "You are Elowen, a helpful research-paper reading assistant. "
                     "Follow the output tag format exactly. Do not include chain-of-thought."
                 ),
             },
@@ -396,46 +396,104 @@ def _extract_message_text(message) -> str:
 def _openai_schema(
     query: str, response_schema: Type[T], model: str, api_key: str, base_url: str
 ) -> T | List[T] | None:
+    from typing import get_args, get_origin
+
     from openai import OpenAI
 
-    client = OpenAI(api_key=api_key, base_url=base_url)
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Respond with only valid JSON, matching the requested schema. "
-                    "Use double quotes. No markdown fences."
-                ),
-            },
-            {"role": "user", "content": query},
-        ],
-        temperature=0,
-        response_format={"type": "json_object"},
-    )
-    text = response.choices[0].message.content
-    if not text:
-        raise LLMInvalidResponseException()
+    # OpenAI json_object mode requires a top-level object; wrap list schemas.
+    wants_list = get_origin(response_schema) in (list, List)
+    item_schema = get_args(response_schema)[0] if wants_list else response_schema
+    if wants_list:
+        schema_instruction = (
+            "Respond with a JSON object of the form "
+            '{"items":[...]} where items is an array matching the requested schema. '
+            "Use double quotes. No markdown fences."
+        )
+        user_query = (
+            f"{query}\n\n"
+            'Return JSON as {"items":[...]} with one object per input id.'
+        )
+    else:
+        schema_instruction = (
+            "Respond with only a valid JSON object matching the requested schema. "
+            "Use double quotes. No markdown fences."
+        )
+        user_query = query
 
-    parsed = _parse_schema_response(text, response_schema)
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    create_kwargs = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": schema_instruction},
+            {"role": "user", "content": user_query},
+        ],
+        "temperature": 0,
+        "max_tokens": max(QUERY_RESPONSE_MAX_OUTPUT_TOKENS, 8192),
+        "response_format": {"type": "json_object"},
+        # DeepSeek reasoning can exhaust the token budget and return empty content.
+        "extra_body": {"thinking": {"type": "disabled"}},
+    }
+    response = client.chat.completions.create(**create_kwargs)
+    choice = response.choices[0] if response.choices else None
+    message = choice.message if choice else None
+    text = _extract_message_text(message)
+    if not text:
+        finish = getattr(choice, "finish_reason", None) if choice else None
+        usage = getattr(response, "usage", None)
+        print(
+            f"  > Empty schema response (finish_reason={finish!r}, usage={usage!r})"
+        )
+        raise LLMInvalidResponseException(
+            f"Empty schema response (finish_reason={finish})"
+        )
+
+    parsed = _parse_schema_response(text, item_schema, expects_list=wants_list)
     if parsed is None:
-        raise LLMInvalidResponseException()
+        raise LLMInvalidResponseException("Could not coerce schema response")
     return parsed
 
 
 def _parse_schema_response(
-    text: str, response_schema: Type[T]
+    text: str, item_schema: Type[T], *, expects_list: bool = False
 ) -> T | List[T] | None:
-    """Attempts to parse JSON text into ``response_schema`` (or list of it)."""
+    """Attempts to parse JSON text into ``item_schema`` (or list of it)."""
     data = json.loads(text)
-    return _coerce_to_schema(data, response_schema)
+    return _coerce_to_schema(data, item_schema, expects_list=expects_list)
 
 
-def _coerce_to_schema(data, response_schema: Type[T]) -> T | List[T] | None:
-    """Coerces parsed JSON into the schema, handling lists and dicts."""
+def _coerce_to_schema(
+    data, item_schema: Type[T], *, expects_list: bool = False
+) -> T | List[T] | None:
+    """Coerces parsed JSON into the schema, handling lists and wrapped dicts."""
+    if expects_list:
+        if isinstance(data, dict):
+            for key in ("items", "data", "results", "labels", "summaries"):
+                if isinstance(data.get(key), list):
+                    data = data[key]
+                    break
+            else:
+                # Single-object fallback when the model returns one dict.
+                try:
+                    return [item_schema(**data)]
+                except Exception:
+                    return None
+        if not isinstance(data, list):
+            return None
+        items: List[T] = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            try:
+                items.append(item_schema(**item))
+            except Exception as e:
+                print(f"  > Skipping invalid schema item: {e}; item={item!r}")
+        return items or None
+
     if isinstance(data, list):
-        return [response_schema(**item) for item in data]
+        # Caller asked for one object but model returned a list.
+        if not data:
+            return None
+        return item_schema(**data[0]) if isinstance(data[0], dict) else None
     if isinstance(data, dict):
-        return response_schema(**data)
+        return item_schema(**data)
     return None

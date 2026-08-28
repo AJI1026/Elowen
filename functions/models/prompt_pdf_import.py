@@ -17,14 +17,14 @@ import json
 from typing import List
 from dataclasses import asdict
 from shared import import_tags
-from shared.lumi_doc import LumiConcept
+from shared.elowen_doc import ElowenConcept
 
 # TODO(ellenj): Consider re-adding these prompt lines if needed.
 # *   **Noise Removal:** Actively identify and remove page gutter text, running headers/footers, or any other noisy text that is not part of the main content.
 # *   **Text Flow & Paragraphs:** Remove hyphens from line-broken hyphenated words to restore original word forms. Important: Make sure to preserve paragraph line breaks from the original paper.
 # *   **Links:** Preserve all existing links, especially those pointing to references. Each reference at the end of the document should be formatted on its own line.
 # *   **Ordering Preservation:** Make sure the flow of the sections and images follow the flow from the original PDF - if there are columns, the left column should come before the right column.
-# *   **Concepts:** Any time a Lumi Concept is mentioned, wrap it like `{import_tags.L_CONCEPT_START_PREFIX}id{import_tags.L_CONCEPT_END}concept text{import_tags.L_CONCEPT_START_PREFIX}id{import_tags.L_CONCEPT_END}`, where N is the id of the concept in the given list of Lumi Concepts. Do NOT mark concepts within headers or references.
+# *   **Concepts:** Any time a Elowen Concept is mentioned, wrap it like `{import_tags.L_CONCEPT_START_PREFIX}id{import_tags.L_CONCEPT_END}concept text{import_tags.L_CONCEPT_START_PREFIX}id{import_tags.L_CONCEPT_END}`, where N is the id of the concept in the given list of Elowen Concepts. Do NOT mark concepts within headers or references.
 
 PDF_IMPORT_FORMATTING_INSTRUCTIONS = rf"""Within these structural tags (but do NOT add any tags within header text), apply the following detailed markdown formatting rules:
 *   **Formatting Preservation:** Crucially, preserve all bold and italic formatting from the original PDF.
@@ -125,7 +125,7 @@ Some more content...
 """
 
 
-def make_import_pdf_prompt(concepts: List[LumiConcept]):
+def make_import_pdf_prompt(concepts: List[ElowenConcept]):
     stringified_concepts = "\n".join(
         [json.dumps(asdict(concept)) for concept in concepts]
     )

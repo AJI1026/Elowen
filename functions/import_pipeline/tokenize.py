@@ -14,7 +14,7 @@
 # ==============================================================================
 import os
 from typing import List
-from shared.lumi_doc import InnerTag, InnerTagName
+from shared.elowen_doc import InnerTag, InnerTagName
 import nltk
 
 nltk.data.path.append(os.path.join(os.path.dirname(__file__), "nltk_data"))

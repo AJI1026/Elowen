@@ -73,8 +73,8 @@ TEST_SECTION_WITH_BULLETS = """Some text before the list items:
 
 
 class TestMarkdownUtils(unittest.TestCase):
-    def test_parse_lumi_import(self):
-        parsed_output = markdown_utils.parse_lumi_import(TEST_PAPER)
+    def test_parse_elowen_import(self):
+        parsed_output = markdown_utils.parse_elowen_import(TEST_PAPER)
 
         # Test Title
         self.assertIn("title", parsed_output)
@@ -153,10 +153,10 @@ class TestMarkdownUtils(unittest.TestCase):
 
         with self.subTest("extracts inline and display math"):
             markdown_input = "Inline math $a=b$ and display math $$c=d$$."
-            expected_text = "Inline math [[LUMI_EQUATION_uid1]] and display math [[LUMI_EQUATION_uid2]]."
+            expected_text = "Inline math [[ELOWEN_EQUATION_uid1]] and display math [[ELOWEN_EQUATION_uid2]]."
             expected_map = {
-                "[[LUMI_EQUATION_uid1]]": "$a=b$",
-                "[[LUMI_EQUATION_uid2]]": "$$c=d$$",
+                "[[ELOWEN_EQUATION_uid1]]": "$a=b$",
+                "[[ELOWEN_EQUATION_uid2]]": "$$c=d$$",
             }
 
             # Reset mock for this subtest
@@ -171,8 +171,8 @@ class TestMarkdownUtils(unittest.TestCase):
 
         with self.subTest("ignores escaped dollar signs"):
             markdown_input = r"This costs \$40, not $a=b$."
-            expected_text = r"This costs \$40, not [[LUMI_EQUATION_uid1]]."
-            expected_map = {"[[LUMI_EQUATION_uid1]]": "$a=b$"}
+            expected_text = r"This costs \$40, not [[ELOWEN_EQUATION_uid1]]."
+            expected_map = {"[[ELOWEN_EQUATION_uid1]]": "$a=b$"}
 
             mock_get_unique_id.side_effect = ["uid1"]
 
@@ -193,8 +193,8 @@ class TestMarkdownUtils(unittest.TestCase):
 
     def test_substitute_equation_placeholders(self):
         with self.subTest("substitutes a single valid placeholder"):
-            text = "Here is an equation: [[LUMI_EQUATION_123]]."
-            placeholder_map = {"[[LUMI_EQUATION_123]]": "$E=mc^2$"}
+            text = "Here is an equation: [[ELOWEN_EQUATION_123]]."
+            placeholder_map = {"[[ELOWEN_EQUATION_123]]": "$E=mc^2$"}
             expected = "Here is an equation: $E=mc^2$."
             self.assertEqual(
                 markdown_utils.substitute_equation_placeholders(text, placeholder_map),
@@ -202,10 +202,10 @@ class TestMarkdownUtils(unittest.TestCase):
             )
 
         with self.subTest("substitutes multiple placeholders"):
-            text = "Eq 1: [[LUMI_EQUATION_A]]. Eq 2: [[LUMI_EQUATION_B]]."
+            text = "Eq 1: [[ELOWEN_EQUATION_A]]. Eq 2: [[ELOWEN_EQUATION_B]]."
             placeholder_map = {
-                "[[LUMI_EQUATION_A]]": "$a^2+b^2=c^2$",
-                "[[LUMI_EQUATION_B]]": "$F=ma$",
+                "[[ELOWEN_EQUATION_A]]": "$a^2+b^2=c^2$",
+                "[[ELOWEN_EQUATION_B]]": "$F=ma$",
             }
             expected = "Eq 1: $a^2+b^2=c^2$. Eq 2: $F=ma$."
             self.assertEqual(
@@ -214,8 +214,8 @@ class TestMarkdownUtils(unittest.TestCase):
             )
 
         with self.subTest("handles placeholder not in map"):
-            text = "This placeholder [[LUMI_EQUATION_C]] is missing."
-            placeholder_map = {"[[LUMI_EQUATION_A]]": "$a=b$"}
+            text = "This placeholder [[ELOWEN_EQUATION_C]] is missing."
+            placeholder_map = {"[[ELOWEN_EQUATION_A]]": "$a=b$"}
             expected = "This placeholder  is missing."
             self.assertEqual(
                 markdown_utils.substitute_equation_placeholders(text, placeholder_map),
@@ -224,7 +224,7 @@ class TestMarkdownUtils(unittest.TestCase):
 
         with self.subTest("returns original string if no placeholders"):
             text = "This string has no placeholders."
-            placeholder_map = {"[[LUMI_EQUATION_A]]": "$a=b$"}
+            placeholder_map = {"[[ELOWEN_EQUATION_A]]": "$a=b$"}
             self.assertEqual(
                 markdown_utils.substitute_equation_placeholders(text, placeholder_map),
                 text,
@@ -365,7 +365,7 @@ Hello, world again!"""
                 markdown_utils.postprocess_content_text(text_input), expected
             )
 
-        with self.subTest("test_remove_lumi_tag"):
+        with self.subTest("test_remove_elowen_tag"):
             text_input = "This text has a [[l-some_tag]] that should be removed."
             expected = "This text has a  that should be removed."
             self.assertEqual(
@@ -435,6 +435,20 @@ Hello, world again!"""
                     text_input_none, strip_double_brackets=True
                 ),
                 text_input_none,
+            )
+
+    def test_normalize_bare_span_refs(self):
+        with self.subTest("rewrites_bare_ids"):
+            text = "claim [[e6c0b60d]] and [[abc]]"
+            out = markdown_utils.normalize_bare_span_refs(text)
+            self.assertIn("[[l-sref-e6c0b60d]]", out)
+            self.assertIn("[[l-sref-abc]]", out)
+            self.assertNotIn("[[e6c0b60d]]", out)
+
+        with self.subTest("keeps_canonical_and_prose"):
+            text = "ok [[l-sref-s1]] and [[not a span id]]"
+            self.assertEqual(
+                markdown_utils.normalize_bare_span_refs(text), text
             )
 
 

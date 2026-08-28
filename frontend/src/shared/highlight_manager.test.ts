@@ -17,7 +17,7 @@
 
 import { expect } from "@esm-bundle/chai";
 import { HighlightManager } from "./highlight_manager";
-import { Highlight } from "./lumi_doc";
+import { Highlight } from "./elowen_doc";
 
 describe("HighlightManager", () => {
   let highlightManager: HighlightManager;

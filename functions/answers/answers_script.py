@@ -26,59 +26,59 @@ project_root = os.path.abspath(os.path.join(script_dir, ".."))
 sys.path.insert(0, project_root)
 
 
-from answers.answers import generate_lumi_answer
-from shared.lumi_doc import (
-    LumiDoc,
-    LumiSection,
-    LumiContent,
+from answers.answers import generate_elowen_answer
+from shared.elowen_doc import (
+    ElowenDoc,
+    ElowenSection,
+    ElowenContent,
     TextContent,
-    LumiSpan,
+    ElowenSpan,
     Heading,
 )
-from shared.api import LumiAnswerRequest
+from shared.api import ElowenAnswerRequest
 
 
-def create_dummy_doc() -> LumiDoc:
-    """Creates a hardcoded LumiDoc for testing."""
-    span1 = LumiSpan(
+def create_dummy_doc() -> ElowenDoc:
+    """Creates a hardcoded ElowenDoc for testing."""
+    span1 = ElowenSpan(
         id="s1",
         text="Gemini is a family of multimodal models developed by Google.",
         inner_tags=[],
     )
-    span2 = LumiSpan(
+    span2 = ElowenSpan(
         id="s2", text="It was announced on December 6, 2023.", inner_tags=[]
     )
-    span3 = LumiSpan(
+    span3 = ElowenSpan(
         id="s3",
         text="The family includes Gemini Ultra, Gemini Pro, and Gemini Nano.",
         inner_tags=[],
     )
-    span4 = LumiSpan(
-        id="s4", text="Lumi is an experimental AI reading app.", inner_tags=[]
+    span4 = ElowenSpan(
+        id="s4", text="Elowen is an experimental AI reading app.", inner_tags=[]
     )
 
-    doc = LumiDoc(
+    doc = ElowenDoc(
         markdown="",
         concepts=[],
         sections=[
-            LumiSection(
+            ElowenSection(
                 id="sec1",
                 heading=Heading(heading_level=1, text="About Gemini"),
                 contents=[
-                    LumiContent(
+                    ElowenContent(
                         id="c1",
                         text_content=TextContent(tag_name="p", spans=[span1, span2]),
                     ),
-                    LumiContent(
+                    ElowenContent(
                         id="c2", text_content=TextContent(tag_name="p", spans=[span3])
                     ),
                 ],
             ),
-            LumiSection(
+            ElowenSection(
                 id="sec2",
-                heading=Heading(heading_level=1, text="About Lumi"),
+                heading=Heading(heading_level=1, text="About Elowen"),
                 contents=[
-                    LumiContent(
+                    ElowenContent(
                         id="c3", text_content=TextContent(tag_name="p", spans=[span4])
                     )
                 ],
@@ -91,7 +91,7 @@ def create_dummy_doc() -> LumiDoc:
 def main():
     """Main function to run the script."""
     parser = argparse.ArgumentParser(
-        description="Test the Lumi answer generation logic."
+        description="Test the Elowen answer generation logic."
     )
     parser.add_argument("--query", type=str, help="The user's query.")
     parser.add_argument("--highlight", type=str, help="The highlighted text.")
@@ -102,20 +102,20 @@ def main():
         print("Error: You must provide either --query or --highlight.")
         return
 
-    # Create a dummy LumiDoc for testing
+    # Create a dummy ElowenDoc for testing
     doc = create_dummy_doc()
     print("Using a dummy document for context...")
 
-    request = LumiAnswerRequest(query=args.query, highlight=args.highlight)
+    request = ElowenAnswerRequest(query=args.query, highlight=args.highlight)
 
     print("Generating answer...")
-    lumi_answer = generate_lumi_answer(doc, request)
+    elowen_answer = generate_elowen_answer(doc, request)
 
     print("\n" + "=" * 20 + " RESULT " + "=" * 20)
-    print(f"Request Query: {lumi_answer.request.query}")
-    print(f"Request Highlight: {lumi_answer.request.highlight}")
+    print(f"Request Query: {elowen_answer.request.query}")
+    print(f"Request Highlight: {elowen_answer.request.highlight}")
     print("\nResponse:")
-    for content in lumi_answer.response_content:
+    for content in elowen_answer.response_content:
         for span in content.text_content.spans:
             print(f"  Span Text: {span.text}")
             if span.inner_tags:

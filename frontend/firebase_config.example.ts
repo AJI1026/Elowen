@@ -17,11 +17,12 @@
 
 import { FirebaseOptions } from "firebase/app";
 
-// TODO: Replace with your firebase config - see https://firebase.google.com/docs/web/setup for instructions.
+// TODO: Replace with your firebase config - see https://firebase.google.com/docs/web/setup.
+// For local emulators, projectId must match `.firebaserc` (default: "elowen-demo").
 export const FIREBASE_CONFIG: FirebaseOptions = {
   apiKey: "",
   authDomain: "",
-  projectId: "",
+  projectId: "elowen-demo",
   storageBucket: "",
   messagingSenderId: "",
   appId: "",

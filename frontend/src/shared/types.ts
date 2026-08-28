@@ -49,7 +49,7 @@ export enum GalleryView {
   CURRENT = "current", // show papers for current collection
 }
 
-export enum LumiFont {
+export enum ElowenFont {
   PAPER_TEXT = "paper-text",
   SPAN_SUMMARY_TEXT = "span-summary-text",
   DEFAULT = "default",

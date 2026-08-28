@@ -24,40 +24,40 @@ project_root = os.path.abspath(os.path.join(script_dir, '..'))
 sys.path.insert(0, project_root)
 
 from import_pipeline.personal_summary import get_personal_summary
-from shared.lumi_doc import LumiDoc, LumiSection, LumiContent, TextContent, LumiSpan, Heading
+from shared.elowen_doc import ElowenDoc, ElowenSection, ElowenContent, TextContent, ElowenSpan, Heading
 from shared.types_local_storage import PaperData
 
 
-def create_dummy_doc() -> LumiDoc:
-    """Creates a hardcoded LumiDoc for testing."""
-    span1 = LumiSpan(id='s1', text='Gemini is a family of multimodal models developed by Google.', inner_tags=[])
-    span2 = LumiSpan(id='s2', text='It was announced on December 6, 2023.', inner_tags=[])
-    span3 = LumiSpan(id='s3', text='The family includes Gemini Ultra, Gemini Pro, and Gemini Nano.', inner_tags=[])
-    span4 = LumiSpan(id='s4', text='Lumi is an experimental AI reading app that uses Gemini.', inner_tags=[])
+def create_dummy_doc() -> ElowenDoc:
+    """Creates a hardcoded ElowenDoc for testing."""
+    span1 = ElowenSpan(id='s1', text='Gemini is a family of multimodal models developed by Google.', inner_tags=[])
+    span2 = ElowenSpan(id='s2', text='It was announced on December 6, 2023.', inner_tags=[])
+    span3 = ElowenSpan(id='s3', text='The family includes Gemini Ultra, Gemini Pro, and Gemini Nano.', inner_tags=[])
+    span4 = ElowenSpan(id='s4', text='Elowen is an experimental AI reading app that uses Gemini.', inner_tags=[])
 
-    doc = LumiDoc(
+    doc = ElowenDoc(
         markdown='',
         concepts=[],
         sections=[
-            LumiSection(
+            ElowenSection(
                 id='sec1',
                 heading=Heading(heading_level=1, text='About Gemini'),
                 contents=[
-                    LumiContent(
+                    ElowenContent(
                         id='c1',
                         text_content=TextContent(tag_name='p', spans=[span1, span2])
                     ),
-                    LumiContent(
+                    ElowenContent(
                         id='c2',
                         text_content=TextContent(tag_name='p', spans=[span3])
                     )
                 ]
             ),
-            LumiSection(
+            ElowenSection(
                 id='sec2',
-                heading=Heading(heading_level=1, text='About Lumi'),
+                heading=Heading(heading_level=1, text='About Elowen'),
                 contents=[
-                    LumiContent(
+                    ElowenContent(
                         id='c3',
                         text_content=TextContent(tag_name='p', spans=[span4])
                     )
@@ -75,7 +75,7 @@ def create_dummy_past_papers() -> list[PaperData]:
 
 def main():
     """Main function to run the script."""
-    # Create a dummy LumiDoc and past papers for testing
+    # Create a dummy ElowenDoc and past papers for testing
     doc = create_dummy_doc()
     past_papers = create_dummy_past_papers()
     print("Using a dummy document and empty past papers list for context...")

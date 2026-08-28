@@ -1,11 +1,11 @@
 {
-  "name": "lumi",
+  "name": "elowen",
   "author": "Google PAIR",
   "version": "1.0.0",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vivtsai/lumi.git"
+    "url": "git+https://github.com/AJI1026/Elowen.git"
   },
   "private": true,
   "scripts": {

@@ -20,7 +20,7 @@ import { html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 import { ReferenceTooltipProps } from "../../services/floating_panel_service";
-import "../lumi_span/lumi_span";
+import "../elowen_span/elowen_span";
 
 import { styles } from "./reference_tooltip.scss";
 
@@ -41,7 +41,7 @@ export class ReferenceTooltip extends MobxLitElement {
     const referenceContent = this.props.reference.span;
 
     return html`<div class="reference-tooltip-component">
-      <lumi-span .span=${referenceContent}></lumi-span>
+      <elowen-span .span=${referenceContent}></elowen-span>
     </div>`;
   }
 }

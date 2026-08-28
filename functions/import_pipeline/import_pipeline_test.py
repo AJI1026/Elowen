@@ -16,24 +16,24 @@
 
 import unittest
 from unittest.mock import patch
-from shared.lumi_doc import (
-    LumiAbstract,
-    LumiSection,
+from shared.elowen_doc import (
+    ElowenAbstract,
+    ElowenSection,
     Heading,
-    LumiContent,
-    LumiSpan,
+    ElowenContent,
+    ElowenSpan,
     InnerTag,
     InnerTagName,
     Position,
     ImageContent,
     FigureContent,
-    LumiReference,
-    LumiDoc,
-    LumiConcept,
+    ElowenReference,
+    ElowenDoc,
+    ElowenConcept,
     TextContent,
-    LumiFootnote,
+    ElowenFootnote,
 )
-from import_pipeline import import_pipeline, convert_html_to_lumi, convert_lumi_spans
+from import_pipeline import import_pipeline, convert_html_to_elowen, convert_elowen_spans
 from models import extract_concepts
 from shared import import_tags
 from shared.types import ArxivMetadata
@@ -41,14 +41,14 @@ from dataclasses import asdict
 
 
 class PreprocessAndReplaceFiguresTest(unittest.TestCase):
-    @patch.object(convert_lumi_spans, "get_unique_id", return_value="123")
-    @patch.object(convert_html_to_lumi, "get_unique_id")
+    @patch.object(convert_elowen_spans, "get_unique_id", return_value="123")
+    @patch.object(convert_html_to_elowen, "get_unique_id")
     @patch.object(import_pipeline, "get_unique_id")
     def test_interleaved_image_and_html_figure(
         self,
         mock_get_unique_id,
         mock_convert_html_get_unique_id,
-        mock_convert_lumi_spans_get_unique_id,
+        mock_convert_elowen_spans_get_unique_id,
     ):
         del mock_convert_html_get_unique_id  # unused
 
@@ -59,21 +59,21 @@ class PreprocessAndReplaceFiguresTest(unittest.TestCase):
         # The mock needs to provide enough unique IDs for all calls within preprocess_and_replace_figures.
         # In this case: 1 for the HTML figure, 1 for its caption, and 1 for the image.
         mock_get_unique_id.side_effect = ["html_id_1", "image_id_1"]
-        mock_convert_lumi_spans_get_unique_id.side_effect = ["caption_id_1"]
+        mock_convert_elowen_spans_get_unique_id.side_effect = ["caption_id_1"]
 
         processed_markdown = import_pipeline.preprocess_and_replace_figures(
             markdown_input, "file_id", placeholder_map
         )
 
         # Check the processed HTML string
-        expected_markdown = "Some text [[LUMI_PLACEHOLDER_image_id_1]] and more text [[LUMI_PLACEHOLDER_html_id_1]]"
+        expected_markdown = "Some text [[ELOWEN_PLACEHOLDER_image_id_1]] and more text [[ELOWEN_PLACEHOLDER_html_id_1]]"
         self.assertEqual(expected_markdown, processed_markdown)
 
         # Check the placeholder map
         self.assertEqual(len(placeholder_map), 2)
 
-        html_placeholder_id = "[[LUMI_PLACEHOLDER_html_id_1]]"
-        image_placeholder_id = "[[LUMI_PLACEHOLDER_image_id_1]]"
+        html_placeholder_id = "[[ELOWEN_PLACEHOLDER_html_id_1]]"
+        image_placeholder_id = "[[ELOWEN_PLACEHOLDER_image_id_1]]"
 
         self.assertIn(html_placeholder_id, placeholder_map)
         self.assertIn(image_placeholder_id, placeholder_map)
@@ -114,14 +114,14 @@ class PreprocessAndReplaceFiguresTest(unittest.TestCase):
             markdown_input, "file_id", placeholder_map
         )
 
-        expected_placeholder_id = "[[LUMI_PLACEHOLDER_uid]]"
+        expected_placeholder_id = "[[ELOWEN_PLACEHOLDER_uid]]"
         self.assertEqual(processed_markdown.strip(), expected_placeholder_id)
         self.assertIn(expected_placeholder_id, placeholder_map)
 
-        lumi_content = placeholder_map[expected_placeholder_id]
-        self.assertIsNotNone(lumi_content.figure_content)
+        elowen_content = placeholder_map[expected_placeholder_id]
+        self.assertIsNotNone(elowen_content.figure_content)
 
-        figure_content = lumi_content.figure_content
+        figure_content = elowen_content.figure_content
         self.assertEqual(figure_content.caption.text, "Main Cap")
         self.assertEqual(len(figure_content.images), 2)
 
@@ -135,25 +135,25 @@ class PreprocessAndReplaceFiguresTest(unittest.TestCase):
 
 
 class ImportPipelineTest(unittest.TestCase):
-    @patch.object(convert_lumi_spans, "get_unique_id", return_value="123")
-    @patch.object(convert_html_to_lumi, "get_unique_id", return_value="123")
+    @patch.object(convert_elowen_spans, "get_unique_id", return_value="123")
+    @patch.object(convert_html_to_elowen, "get_unique_id", return_value="123")
     @patch.object(extract_concepts, "get_unique_id", return_value="123")
-    @patch("import_pipeline.markdown_utils.parse_lumi_import")
-    def test_convert_model_output_to_lumi_doc_with_abstract(
+    @patch("import_pipeline.markdown_utils.parse_elowen_import")
+    def test_convert_model_output_to_elowen_doc_with_abstract(
         self,
-        mock_parse_lumi_import,
+        mock_parse_elowen_import,
         mock_get_unique_id_extract_concepts,
-        mock_get_unique_id_convert_html_to_lumi,
-        mock_get_unique_id_convert_lumi_spans,
+        mock_get_unique_id_convert_html_to_elowen,
+        mock_get_unique_id_convert_elowen_spans,
     ):
         """Tests that concept inner tags in abstract are correctly parsed."""
         self.maxDiff = None
         del mock_get_unique_id_extract_concepts  # unused
-        del mock_get_unique_id_convert_html_to_lumi  # unused
-        del mock_get_unique_id_convert_lumi_spans  # unused
+        del mock_get_unique_id_convert_html_to_elowen  # unused
+        del mock_get_unique_id_convert_elowen_spans  # unused
 
         # Mock the output of the markdown parser
-        mock_parse_lumi_import.return_value = {
+        mock_parse_elowen_import.return_value = {
             "abstract": "Here's an abstract with a concept",
             "content": "",
             "references": [],
@@ -161,17 +161,17 @@ class ImportPipelineTest(unittest.TestCase):
         }
 
         concepts = [
-            LumiConcept(id="123", name="concept", contents=[], in_text_citations=[])
+            ElowenConcept(id="123", name="concept", contents=[], in_text_citations=[])
         ]
 
-        expected_abstract = LumiAbstract(
+        expected_abstract = ElowenAbstract(
             contents=[
-                LumiContent(
+                ElowenContent(
                     id="123",
                     text_content=TextContent(
                         tag_name="p",
                         spans=[
-                            LumiSpan(
+                            ElowenSpan(
                                 id="123",
                                 text="Here's an abstract with a concept",
                                 inner_tags=[
@@ -191,32 +191,32 @@ class ImportPipelineTest(unittest.TestCase):
         )
 
         # Call the function to be tested
-        lumi_doc = import_pipeline.convert_model_output_to_lumi_doc(
-            # This string doesn't matter since parse_lumi_import is mocked
+        elowen_doc = import_pipeline.convert_model_output_to_elowen_doc(
+            # This string doesn't matter since parse_elowen_import is mocked
             model_output_string="dummy_string",
             concepts=concepts,
             file_id="test_file",
         )
 
-        self.assertEqual(asdict(expected_abstract), asdict(lumi_doc.abstract))
+        self.assertEqual(asdict(expected_abstract), asdict(elowen_doc.abstract))
 
-    @patch.object(convert_lumi_spans, "get_unique_id", return_value="123")
-    @patch.object(convert_html_to_lumi, "get_unique_id", return_value="123")
-    @patch("import_pipeline.markdown_utils.parse_lumi_import")
-    def test_convert_model_output_to_lumi_doc_with_references(
+    @patch.object(convert_elowen_spans, "get_unique_id", return_value="123")
+    @patch.object(convert_html_to_elowen, "get_unique_id", return_value="123")
+    @patch("import_pipeline.markdown_utils.parse_elowen_import")
+    def test_convert_model_output_to_elowen_doc_with_references(
         self,
-        mock_parse_lumi_import,
-        mock_get_unique_id_convert_html_to_lumi,
-        mock_get_unique_id_convert_lumi_spans,
+        mock_parse_elowen_import,
+        mock_get_unique_id_convert_html_to_elowen,
+        mock_get_unique_id_convert_elowen_spans,
     ):
         """Tests that inner tags in references are correctly parsed."""
-        del mock_get_unique_id_convert_html_to_lumi  # unused
-        del mock_get_unique_id_convert_lumi_spans  # unused
+        del mock_get_unique_id_convert_html_to_elowen  # unused
+        del mock_get_unique_id_convert_elowen_spans  # unused
 
         self.maxDiff = None
 
         # Mock the output of the markdown parser
-        mock_parse_lumi_import.return_value = {
+        mock_parse_elowen_import.return_value = {
             "abstract": "",
             "content": "",
             "references": [
@@ -227,9 +227,9 @@ class ImportPipelineTest(unittest.TestCase):
         }
 
         expected_references = [
-            LumiReference(
+            ElowenReference(
                 id="ref1",
-                span=LumiSpan(
+                span=ElowenSpan(
                     id="123",
                     text="This is a bold reference.",
                     inner_tags=[
@@ -243,9 +243,9 @@ class ImportPipelineTest(unittest.TestCase):
                     ],
                 ),
             ),
-            LumiReference(
+            ElowenReference(
                 id="ref2",
-                span=LumiSpan(
+                span=ElowenSpan(
                     id="123",
                     text="This is an italic one.",
                     inner_tags=[
@@ -262,37 +262,37 @@ class ImportPipelineTest(unittest.TestCase):
         ]
 
         # Call the function to be tested
-        lumi_doc = import_pipeline.convert_model_output_to_lumi_doc(
-            # This string doesn't matter since parse_lumi_import is mocked
+        elowen_doc = import_pipeline.convert_model_output_to_elowen_doc(
+            # This string doesn't matter since parse_elowen_import is mocked
             model_output_string="dummy_string",
             concepts=[],
             file_id="test_file",
         )
 
-        # Assert that the references in the LumiDoc are what we expect
-        self.assertEqual(len(expected_references), len(lumi_doc.references))
+        # Assert that the references in the ElowenDoc are what we expect
+        self.assertEqual(len(expected_references), len(elowen_doc.references))
         for i in range(len(expected_references)):
             self.assertEqual(
-                asdict(expected_references[i]), asdict(lumi_doc.references[i])
+                asdict(expected_references[i]), asdict(elowen_doc.references[i])
             )
 
-    @patch.object(convert_lumi_spans, "get_unique_id", return_value="123")
-    @patch.object(convert_html_to_lumi, "get_unique_id", return_value="123")
-    @patch("import_pipeline.markdown_utils.parse_lumi_import")
-    def test_convert_model_output_to_lumi_doc_with_footnotes(
+    @patch.object(convert_elowen_spans, "get_unique_id", return_value="123")
+    @patch.object(convert_html_to_elowen, "get_unique_id", return_value="123")
+    @patch("import_pipeline.markdown_utils.parse_elowen_import")
+    def test_convert_model_output_to_elowen_doc_with_footnotes(
         self,
-        mock_parse_lumi_import,
-        mock_get_unique_id_html_to_lumi,
-        mock_get_unique_id_lumi_spans,
+        mock_parse_elowen_import,
+        mock_get_unique_id_html_to_elowen,
+        mock_get_unique_id_elowen_spans,
     ):
         """Tests that footnotes are correctly parsed."""
         self.maxDiff = None
-        del mock_get_unique_id_html_to_lumi  # unused
-        del mock_get_unique_id_lumi_spans  # unused
+        del mock_get_unique_id_html_to_elowen  # unused
+        del mock_get_unique_id_elowen_spans  # unused
 
         # Mock the output of the markdown parser
         footnotes_string = f"{import_tags.L_FOOTNOTE_CONTENT_START_PREFIX}1{import_tags.L_FOOTNOTE_CONTENT_END}Footnote 1 text.{import_tags.L_FOOTNOTE_CONTENT_END_PREFIX}1{import_tags.L_FOOTNOTE_CONTENT_END}{import_tags.L_FOOTNOTE_CONTENT_START_PREFIX}2{import_tags.L_FOOTNOTE_CONTENT_END}Footnote <b>2</b> text.{import_tags.L_FOOTNOTE_CONTENT_END_PREFIX}2{import_tags.L_FOOTNOTE_CONTENT_END}"
-        mock_parse_lumi_import.return_value = {
+        mock_parse_elowen_import.return_value = {
             "abstract": "",
             "content": "",
             "references": [],
@@ -303,17 +303,17 @@ class ImportPipelineTest(unittest.TestCase):
         }
 
         expected_footnotes = [
-            LumiFootnote(
+            ElowenFootnote(
                 id="1",
-                span=LumiSpan(
+                span=ElowenSpan(
                     id="123",
                     text="Footnote 1 text.",
                     inner_tags=[],
                 ),
             ),
-            LumiFootnote(
+            ElowenFootnote(
                 id="2",
-                span=LumiSpan(
+                span=ElowenSpan(
                     id="123",
                     text="Footnote 2 text.",
                     inner_tags=[
@@ -330,20 +330,20 @@ class ImportPipelineTest(unittest.TestCase):
         ]
 
         # Call the function to be tested
-        lumi_doc = import_pipeline.convert_model_output_to_lumi_doc(
+        elowen_doc = import_pipeline.convert_model_output_to_elowen_doc(
             model_output_string="dummy_string",
             concepts=[],
             file_id="test_file",
         )
 
-        # Assert that the footnotes in the LumiDoc are what we expect
-        self.assertEqual(len(expected_footnotes), len(lumi_doc.footnotes))
+        # Assert that the footnotes in the ElowenDoc are what we expect
+        self.assertEqual(len(expected_footnotes), len(elowen_doc.footnotes))
         for i in range(len(expected_footnotes)):
             self.assertEqual(
-                asdict(expected_footnotes[i]), asdict(lumi_doc.footnotes[i])
+                asdict(expected_footnotes[i]), asdict(elowen_doc.footnotes[i])
             )
 
-    @patch("import_pipeline.import_pipeline.convert_model_output_to_lumi_doc")
+    @patch("import_pipeline.import_pipeline.convert_model_output_to_elowen_doc")
     @patch("import_pipeline.import_pipeline.gemini")
     @patch("import_pipeline.import_pipeline.image_utils")
     @patch("import_pipeline.import_pipeline.latex_utils")
@@ -365,7 +365,7 @@ class ImportPipelineTest(unittest.TestCase):
         mock_latex_utils.inline_tex_files.return_value = "inlined_latex_string"
         mock_gemini.format_pdf_with_latex.return_value = "model_output"
 
-        # Mock the returned LumiDoc to have an image
+        # Mock the returned ElowenDoc to have an image
         mock_image_content = ImageContent(
             latex_path="fig1.png",
             storage_path="1234.5678/images/fig1.png",
@@ -376,18 +376,18 @@ class ImportPipelineTest(unittest.TestCase):
         )
         mock_figure_content = FigureContent(
             images=[mock_image_content],
-            caption=LumiSpan(id="cap1", text="main caption", inner_tags=[]),
+            caption=ElowenSpan(id="cap1", text="main caption", inner_tags=[]),
         )
-        mock_doc = LumiDoc(
+        mock_doc = ElowenDoc(
             markdown="",
             abstract=None,
             sections=[
-                LumiSection(
+                ElowenSection(
                     id="s1",
                     heading=Heading(0, ""),
                     contents=[
-                        LumiContent(id="c1", image_content=mock_image_content),
-                        LumiContent(id="c2", figure_content=mock_figure_content),
+                        ElowenContent(id="c1", image_content=mock_image_content),
+                        ElowenContent(id="c2", figure_content=mock_figure_content),
                     ],
                 )
             ],
@@ -401,7 +401,7 @@ class ImportPipelineTest(unittest.TestCase):
         arxiv_id = "1234.5678"
         version = "1"
         concepts = [
-            LumiConcept(id="C1", name="Test Concept", contents=[], in_text_citations=[])
+            ElowenConcept(id="C1", name="Test Concept", contents=[], in_text_citations=[])
         ]
         metadata = ArxivMetadata(
             paper_id=arxiv_id,
@@ -446,7 +446,7 @@ class ImportPipelineTest(unittest.TestCase):
         self.assertEqual(kwargs["image_contents"][0], mock_image_content)
         self.assertEqual(kwargs["image_contents"][1], mock_image_content)
 
-        self.assertIsInstance(result, LumiDoc)
+        self.assertIsInstance(result, ElowenDoc)
         self.assertEqual(result, mock_doc)
 
 

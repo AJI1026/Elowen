@@ -335,13 +335,13 @@
   --md-ref-palette-error100: #fff;
 }
 
-// Light theme (using Google purple, blue, green)
+// Light theme (blue primary)
 @mixin light {
-  --md-sys-color-primary: rgb(106 83 140);
-  --md-sys-color-surface-tint: rgb(106 83 140);
+  --md-sys-color-primary: rgb(17 87 206);
+  --md-sys-color-surface-tint: rgb(17 87 206);
   --md-sys-color-on-primary: rgb(255 255 255);
-  --md-sys-color-primary-container: rgb(237 220 255);
-  --md-sys-color-on-primary-container: rgb(82 60 115);
+  --md-sys-color-primary-container: rgb(208 228 255);
+  --md-sys-color-on-primary-container: rgb(1 44 111);
   --md-sys-color-secondary: rgb(21 102 131);
   --md-sys-color-on-secondary: rgb(255 255 255);
   --md-sys-color-secondary-container: rgb(192 232 255);
@@ -354,30 +354,30 @@
   --md-sys-color-on-error: rgb(255 255 255);
   --md-sys-color-error-container: rgb(255 218 213);
   --md-sys-color-on-error-container: rgb(115 52 44);
-  --md-sys-color-background: rgb(254 247 255);
-  --md-sys-color-on-background: rgb(29 26 32);
-  // --md-sys-color-surface: rgb(254 247 255); // default assignment
+  --md-sys-color-background: rgb(245 250 255);
+  --md-sys-color-on-background: rgb(26 28 32);
+  // --md-sys-color-surface: rgb(245 250 255); // default assignment
   --md-sys-color-surface: var(--md-ref-palette-gray100);
-  // --md-sys-color-on-surface: rgb(29 26 32); // default assignment
+  // --md-sys-color-on-surface: rgb(26 28 32); // default assignment
   --md-sys-color-on-surface: var(--md-ref-gray10);
   --md-sys-color-on-surface-low: var(--md-ref-palette-gray5);
   --md-sys-color-on-surface-high: var(--md-ref-palette-gray30);
   --md-sys-color-on-surface-higher: var(--md-ref-palette-gray50);
   --md-sys-color-on-surface-highest: var(--md-ref-palette-gray70);
   --md-sys-color-on-surface-highest-variant: var(--md-ref-palette-gray80);
-  --md-sys-color-surface-variant: rgb(232 224 235);
-  --md-sys-color-on-surface-variant: rgb(74 69 78);
-  --md-sys-color-outline: rgb(123 117 127);
-  --md-sys-color-outline-variant: rgb(203 196 207);
+  --md-sys-color-surface-variant: rgb(224 230 240);
+  --md-sys-color-on-surface-variant: rgb(69 74 84);
+  --md-sys-color-outline: rgb(117 123 135);
+  --md-sys-color-outline-variant: rgb(196 203 214);
   --md-sys-color-shadow: rgb(0 0 0);
   --md-sys-color-scrim: rgb(0 0 0);
-  --md-sys-color-inverse-surface: rgb(50 47 53);
-  --md-sys-color-inverse-on-surface: rgb(246 238 247);
-  --md-sys-color-inverse-primary: rgb(214 187 251);
-  --md-sys-color-primary-fixed: rgb(237 220 255);
-  --md-sys-color-on-primary-fixed: rgb(37 14 68);
-  --md-sys-color-primary-fixed-dim: rgb(214 187 251);
-  --md-sys-color-on-primary-fixed-variant: rgb(82 60 115);
+  --md-sys-color-inverse-surface: rgb(47 50 56);
+  --md-sys-color-inverse-on-surface: rgb(238 243 250);
+  --md-sys-color-inverse-primary: rgb(161 201 255);
+  --md-sys-color-primary-fixed: rgb(208 228 255);
+  --md-sys-color-on-primary-fixed: rgb(0 25 68);
+  --md-sys-color-primary-fixed-dim: rgb(161 201 255);
+  --md-sys-color-on-primary-fixed-variant: rgb(1 44 111);
   --md-sys-color-secondary-fixed: rgb(192 232 255);
   --md-sys-color-on-secondary-fixed: rgb(0 31 43);
   --md-sys-color-secondary-fixed-dim: rgb(140 207 241);
@@ -386,13 +386,13 @@
   --md-sys-color-on-tertiary-fixed: rgb(0 33 7);
   --md-sys-color-tertiary-fixed-dim: rgb(157 212 157);
   --md-sys-color-on-tertiary-fixed-variant: rgb(31 80 39);
-  --md-sys-color-surface-dim: rgb(223 216 224);
-  --md-sys-color-surface-bright: rgb(254 247 255);
+  --md-sys-color-surface-dim: rgb(216 224 234);
+  --md-sys-color-surface-bright: rgb(245 250 255);
   --md-sys-color-surface-container-lowest: rgb(255 255 255);
-  --md-sys-color-surface-container-low: rgb(249 241 249);
-  --md-sys-color-surface-container: rgb(243 236 244);
-  --md-sys-color-surface-container-high: rgb(237 230 238);
-  --md-sys-color-surface-container-highest: rgb(231 224 232);
+  --md-sys-color-surface-container-low: rgb(241 246 252);
+  --md-sys-color-surface-container: rgb(236 242 250);
+  --md-sys-color-surface-container-high: rgb(230 237 247);
+  --md-sys-color-surface-container-highest: rgb(224 232 244);
 
   /*
   // Legacy color assignment
@@ -439,12 +439,12 @@
   */
 
   // custom variables
-  --md-sys-color-primary-container-low: var(--md-ref-palette-purple95);
-  --md-sys-color-primary-container-lowest: var(--md-ref-palette-purple98);
-  --md-sys-color-primary-container-high: var(--md-ref-palette-purple80);
-  --md-sys-color-secondary-container-low: var(--md-ref-palette-blue95);
-  --md-sys-color-secondary-container-lowest: var(--md-ref-palette-blue98);
-  --md-sys-color-secondary-container-high: var(--md-ref-palette-blue80);
+  --md-sys-color-primary-container-low: var(--md-ref-palette-blue95);
+  --md-sys-color-primary-container-lowest: var(--md-ref-palette-blue98);
+  --md-sys-color-primary-container-high: var(--md-ref-palette-blue80);
+  --md-sys-color-secondary-container-low: var(--md-ref-palette-cyan95);
+  --md-sys-color-secondary-container-lowest: var(--md-ref-palette-cyan98);
+  --md-sys-color-secondary-container-high: var(--md-ref-palette-cyan80);
   --md-sys-color-tertiary-container-low: var(--md-ref-palette-green95);
   --md-sys-color-tertiary-container-lowest: var(--md-ref-palette-green98);
   --md-sys-color-tertiary-container-high: var(--md-ref-palette-green80);
@@ -467,34 +467,34 @@
   --md-sys-color-gray-outline: var(--md-ref-palette-gray50);
   --md-sys-color-gray-outline-variant: var(--md-ref-palette-gray80);
   // visualization highlight variables
-  --md-sys-color-highlight-primary: var(--md-ref-palette-primary90);
-  --md-sys-color-highlight-primary-light: var(--md-ref-palette-primary95);
-  --md-sys-color-highlight-secondary: var(--md-ref-palette-secondary90);
-  --md-sys-color-highlight-secondary-light: var(--md-ref-palette-secondary95);
+  --md-sys-color-highlight-primary: var(--md-ref-palette-blue90);
+  --md-sys-color-highlight-primary-light: var(--md-ref-palette-blue95);
+  --md-sys-color-highlight-secondary: var(--md-ref-palette-cyan90);
+  --md-sys-color-highlight-secondary-light: var(--md-ref-palette-cyan95);
   --md-sys-color-highlight-gray: var(--md-ref-palette-gray90);
   --md-sys-color-highlight-light-gray: var(--md-ref-palette-gray95);
   --md-sys-color-highlight-blue: var(--md-ref-palette-blue95);
   --md-sys-color-highlight-blue-high: var(--md-ref-palette-blue90);
   --md-sys-color-highlight-pink: var(--md-ref-palette-pink95);
-  --md-sys-color-highlight-yellow: var(--md-ref-palette-yellow98);
+  --md-sys-color-highlight-yellow: var(--md-ref-palette-yellow90);
   --md-sys-color-highlight-green-light: var(--md-ref-palette-green98);
   --md-sys-color-highlight-green: var(--md-ref-palette-green95);
   --md-sys-color-highlight-green-high: var(--md-ref-palette-green90);
-  --md-sys-color-highlight-purple: var(--md-ref-palette-purple95);
-  --md-sys-color-highlight-orange: var(--md-ref-palette-orange95);
+  --md-sys-color-highlight-purple: var(--md-ref-palette-blue95);
+  --md-sys-color-highlight-orange: var(--md-ref-palette-orange90);
   --md-sys-color-highlight-cyan: var(--md-ref-palette-cyan95);
   --md-sys-color-highlight-cyan-light: var(--md-ref-palette-cyan98);
   // focus state variables
   --md-sys-color-focus-state-focused-background: var(--md-ref-palette-gray96);
 }
 
-// Dark theme (Google purple, blue, green)
+// Dark theme (blue primary)
 @mixin dark {
-  --md-sys-color-primary: rgb(214 187 251);
-  --md-sys-color-surface-tint: rgb(214 187 251);
-  --md-sys-color-on-primary: rgb(59 37 91);
-  --md-sys-color-primary-container: rgb(82 60 115);
-  --md-sys-color-on-primary-container: rgb(237 220 255);
+  --md-sys-color-primary: rgb(161 201 255);
+  --md-sys-color-surface-tint: rgb(161 201 255);
+  --md-sys-color-on-primary: rgb(1 44 111);
+  --md-sys-color-primary-container: rgb(4 64 159);
+  --md-sys-color-on-primary-container: rgb(208 228 255);
   --md-sys-color-secondary: rgb(140 207 241);
   --md-sys-color-on-secondary: rgb(0 53 71);
   --md-sys-color-secondary-container: rgb(0 77 102);
@@ -507,28 +507,28 @@
   --md-sys-color-on-error: rgb(86 30 24);
   --md-sys-color-error-container: rgb(115 52 44);
   --md-sys-color-on-error-container: rgb(255 218 213);
-  --md-sys-color-background: rgb(21 18 24);
-  --md-sys-color-on-background: rgb(231 224 232);
-  --md-sys-color-surface: rgb(21 18 24);
-  --md-sys-color-on-surface: rgb(231 224 232);
+  --md-sys-color-background: rgb(18 22 28);
+  --md-sys-color-on-background: rgb(224 232 244);
+  --md-sys-color-surface: rgb(18 22 28);
+  --md-sys-color-on-surface: rgb(224 232 244);
   --md-sys-color-on-surface-low: var(--md-ref-palette-gray90);
   --md-sys-color-on-surface-high: var(--md-ref-palette-gray70);
   --md-sys-color-on-surface-higher: var(--md-ref-palette-gray60);
   --md-sys-color-on-surface-highest: var(--md-ref-palette-gray30);
   --md-sys-color-on-surface-highest-variant: var(--md-ref-palette-gray20);
-  --md-sys-color-surface-variant: rgb(74 69 78);
-  --md-sys-color-on-surface-variant: rgb(203 196 207);
-  --md-sys-color-outline: rgb(149 142 153);
-  --md-sys-color-outline-variant: rgb(74 69 78);
+  --md-sys-color-surface-variant: rgb(69 74 84);
+  --md-sys-color-on-surface-variant: rgb(196 203 214);
+  --md-sys-color-outline: rgb(142 149 162);
+  --md-sys-color-outline-variant: rgb(69 74 84);
   --md-sys-color-shadow: rgb(0 0 0);
   --md-sys-color-scrim: rgb(0 0 0);
-  --md-sys-color-inverse-surface: rgb(231 224 232);
-  --md-sys-color-inverse-on-surface: rgb(50 47 53);
-  --md-sys-color-inverse-primary: rgb(106 83 140);
-  --md-sys-color-primary-fixed: rgb(237 220 255);
-  --md-sys-color-on-primary-fixed: rgb(37 14 68);
-  --md-sys-color-primary-fixed-dim: rgb(214 187 251);
-  --md-sys-color-on-primary-fixed-variant: rgb(82 60 115);
+  --md-sys-color-inverse-surface: rgb(224 232 244);
+  --md-sys-color-inverse-on-surface: rgb(47 50 56);
+  --md-sys-color-inverse-primary: rgb(17 87 206);
+  --md-sys-color-primary-fixed: rgb(208 228 255);
+  --md-sys-color-on-primary-fixed: rgb(0 25 68);
+  --md-sys-color-primary-fixed-dim: rgb(161 201 255);
+  --md-sys-color-on-primary-fixed-variant: rgb(1 44 111);
   --md-sys-color-secondary-fixed: rgb(192 232 255);
   --md-sys-color-on-secondary-fixed: rgb(0 31 43);
   --md-sys-color-secondary-fixed-dim: rgb(140 207 241);
@@ -537,13 +537,13 @@
   --md-sys-color-on-tertiary-fixed: rgb(0 33 7);
   --md-sys-color-tertiary-fixed-dim: rgb(157 212 157);
   --md-sys-color-on-tertiary-fixed-variant: rgb(31 80 39);
-  --md-sys-color-surface-dim: rgb(21 18 24);
-  --md-sys-color-surface-bright: rgb(59 56 62);
-  --md-sys-color-surface-container-lowest: rgb(16 13 18);
-  --md-sys-color-surface-container-low: rgb(29 26 32);
-  --md-sys-color-surface-container: rgb(33 30 36);
-  --md-sys-color-surface-container-high: rgb(44 41 47);
-  --md-sys-color-surface-container-highest: rgb(55 51 58);
+  --md-sys-color-surface-dim: rgb(18 22 28);
+  --md-sys-color-surface-bright: rgb(56 62 72);
+  --md-sys-color-surface-container-lowest: rgb(13 16 20);
+  --md-sys-color-surface-container-low: rgb(26 30 36);
+  --md-sys-color-surface-container: rgb(30 35 42);
+  --md-sys-color-surface-container-high: rgb(41 47 56);
+  --md-sys-color-surface-container-highest: rgb(51 58 68);
 
   /*
   // Legacy color assignment
@@ -590,12 +590,12 @@
   */
 
   // custom variables
-  --md-sys-color-primary-container-low: var(--md-ref-palette-purple20);
-  --md-sys-color-primary-container-lowest: var(--md-ref-palette-purple10);
-  --md-sys-color-primary-container-high: var(--md-ref-palette-purple40);
-  --md-sys-color-secondary-container-low: var(--md-ref-palette-blue20);
-  --md-sys-color-secondary-container-lowest: var(--md-ref-palette-blue10);
-  --md-sys-color-secondary-container-high: var(--md-ref-palette-blue40);
+  --md-sys-color-primary-container-low: var(--md-ref-palette-blue20);
+  --md-sys-color-primary-container-lowest: var(--md-ref-palette-blue10);
+  --md-sys-color-primary-container-high: var(--md-ref-palette-blue40);
+  --md-sys-color-secondary-container-low: var(--md-ref-palette-cyan20);
+  --md-sys-color-secondary-container-lowest: var(--md-ref-palette-cyan10);
+  --md-sys-color-secondary-container-high: var(--md-ref-palette-cyan40);
   --md-sys-color-tertiary-container-low: var(--md-ref-palette-green20);
   --md-sys-color-tertiary-container-lowest: var(--md-ref-palette-green10);
   --md-sys-color-tertiary-container-high: var(--md-ref-palette-green40);
@@ -618,21 +618,21 @@
   --md-sys-color-gray-outline: var(--md-ref-palette-gray50);
   --md-sys-color-gray-outline-variant: var(--md-ref-palette-gray30);
   // visualization highlight variables
-  --md-sys-color-highlight-primary: var(--md-ref-palette-primary10);
-  --md-sys-color-highlight-primary-light: var(--md-ref-palette-primary5);
-  --md-sys-color-highlight-secondary: var(--md-ref-palette-secondary10);
-  --md-sys-color-highlight-secondary-light: var(--md-ref-palette-secondary5);
+  --md-sys-color-highlight-primary: var(--md-ref-palette-blue10);
+  --md-sys-color-highlight-primary-light: var(--md-ref-palette-blue10);
+  --md-sys-color-highlight-secondary: var(--md-ref-palette-cyan10);
+  --md-sys-color-highlight-secondary-light: var(--md-ref-palette-cyan5);
   --md-sys-color-highlight-gray: var(--md-ref-palette-gray20);
   --md-sys-color-highlight-light-gray: var(--md-ref-palette-gray10);
   --md-sys-color-highlight-blue: var(--md-ref-palette-blue10);
   --md-sys-color-highlight-blue-high: var(--md-ref-palette-blue15);
   --md-sys-color-highlight-pink: var(--md-ref-palette-pink10);
-  --md-sys-color-highlight-yellow: var(--md-ref-palette-yellow10);
+  --md-sys-color-highlight-yellow: var(--md-ref-palette-yellow80);
   --md-sys-color-highlight-green-light: var(--md-ref-palette-green5);
   --md-sys-color-highlight-green: var(--md-ref-palette-green10);
   --md-sys-color-highlight-green-high: var(--md-ref-palette-green20);
-  --md-sys-color-highlight-purple: var(--md-ref-palette-purple10);
-  --md-sys-color-highlight-orange: var(--md-ref-palette-orange10);
+  --md-sys-color-highlight-purple: var(--md-ref-palette-blue10);
+  --md-sys-color-highlight-orange: var(--md-ref-palette-orange80);
   --md-sys-color-highlight-cyan: var(--md-ref-palette-cyan10);
   --md-sys-color-highlight-cyan-light: var(--md-ref-palette-cyan5);
   // focus state variables

@@ -16,8 +16,8 @@
  */
 
 import { action, makeObservable, observable } from "mobx";
-import { LumiSection } from "./lumi_doc";
-import { LumiDocManager } from "./lumi_doc_manager";
+import { ElowenSection } from "./elowen_doc";
+import { ElowenDocManager } from "./elowen_doc_manager";
 import { isViewportSmall } from "./responsive_utils";
 import { INITIAL_SIDEBAR_TAB } from "./constants";
 
@@ -43,7 +43,7 @@ export class CollapseManager {
   sidebarTabSelection: string = INITIAL_SIDEBAR_TAB;
   isMobileSidebarCollapsed = INITIAL_MOBILE_SIDEBAR_COLLAPSED;
 
-  constructor(private readonly lumiDocManager: LumiDocManager) {
+  constructor(private readonly elowenDocManager: ElowenDocManager) {
     makeObservable(this, {
       mobileSummaryCollapseState: observable.shallow,
       isAbstractCollapsed: observable,
@@ -91,7 +91,7 @@ export class CollapseManager {
   }
 
   setAllMobileSummariesCollapsed(isCollapsed: boolean) {
-    const setAllCollapsedInSection = (section: LumiSection) => {
+    const setAllCollapsedInSection = (section: ElowenSection) => {
       section.contents.forEach((content) => {
         this.mobileSummaryCollapseState.set(content.id, isCollapsed);
       });
@@ -103,7 +103,7 @@ export class CollapseManager {
       }
     };
 
-    this.lumiDocManager.lumiDoc.sections.forEach((section) => {
+    this.elowenDocManager.elowenDoc.sections.forEach((section) => {
       setAllCollapsedInSection(section);
     });
   }

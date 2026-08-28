@@ -21,9 +21,11 @@ import { customElement, property, state } from "lit/decorators.js";
 import { styles } from "./sidebar_header.scss";
 import { core } from "../../core/core";
 import { RouterService, Pages } from "../../services/router.service";
-import { APP_NAME, LOGO_ICON_NAME } from "../../shared/constants";
+import { APP_NAME } from "../../shared/constants";
 import "../../pair-components/icon_button";
 import "../../pair-components/tooltip";
+import "../language_toggle/language_toggle";
+import "../elowen_logo/elowen_logo";
 import {
   AnalyticsAction,
   AnalyticsService,
@@ -39,6 +41,8 @@ import {
   OverflowMenuItem,
   OverflowMenuProps,
 } from "../../services/floating_panel_service";
+import { SettingsService } from "../../services/settings.service";
+import { t } from "../../shared/i18n";
 
 /**
  * The header for the sidebar.
@@ -50,6 +54,11 @@ export class SidebarHeader extends MobxLitElement {
   private readonly dialogService = core.getService(DialogService);
   private readonly floatingPanelService = core.getService(FloatingPanelService);
   private readonly routerService = core.getService(RouterService);
+  private readonly settingsService = core.getService(SettingsService);
+
+  private uiLang() {
+    return this.settingsService.responseLanguage.value;
+  }
 
   @property({type: Boolean}) includeAppName = false;
 
@@ -80,20 +89,21 @@ export class SidebarHeader extends MobxLitElement {
   }
 
   private handleOverflowClick(e: Event) {
+    const lang = this.uiLang();
     const menuItems: OverflowMenuItem[] = [
       {
         icon: "contextual_token",
-        label: "View Lumi history",
+        label: t("header.history", lang),
         onClick: this.onSeeHistoryClick.bind(this),
       },
       {
         icon: "feedback",
-        label: "Send feedback",
+        label: t("header.feedback", lang),
         onClick: this.handleFeedbackClick.bind(this),
       },
       {
         icon: "help",
-        label: "Tutorial",
+        label: t("header.tutorial", lang),
         onClick: this.handleTutorialClick.bind(this),
       },
     ];
@@ -102,21 +112,22 @@ export class SidebarHeader extends MobxLitElement {
   }
 
   private renderContent() {
+    const lang = this.uiLang();
     return html`<div class="default-content">
       <div class="left-container">
-        <pr-tooltip text="Lumi home" position="RIGHT">
-          <pr-icon-button
-            variant="default"
-            icon=${LOGO_ICON_NAME}
-            @click=${this.navigateHome}
-          ></pr-icon-button>
+        <pr-tooltip text=${t("header.home", lang)} position="RIGHT">
+          <elowen-logo
+            .title=${t("header.home", lang)}
+            .onClick=${() => this.navigateHome()}
+          ></elowen-logo>
         </pr-tooltip>
         ${this.includeAppName ? html`<div class="title">${APP_NAME}</div>` : nothing}
       </div>
       <slot></slot>
       <div class="right-container">
+        <language-toggle></language-toggle>
         <pr-icon-button
-          title="More options"
+          title=${t("header.moreOptions", lang)}
           icon="more_vert"
           variant="default"
           @click=${this.handleOverflowClick}

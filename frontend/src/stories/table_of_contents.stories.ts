@@ -17,11 +17,11 @@
 
 import { html } from "lit";
 
-import { LumiSection } from "../shared/lumi_doc";
+import { ElowenSection } from "../shared/elowen_doc";
 
 import "../components/table_of_contents/table_of_contents";
 
-const mockSections: LumiSection[] = [
+const mockSections: ElowenSection[] = [
   {
     id: "section-1",
     heading: { headingLevel: 1, text: "Introduction" },

@@ -16,7 +16,7 @@
  */
 
 import { action, makeObservable, observable } from "mobx";
-import { Highlight } from "./lumi_doc";
+import { Highlight } from "./elowen_doc";
 
 /**
  * Manages the highlight state of spans in a document.

@@ -14,7 +14,7 @@
 # ==============================================================================
 
 # summaries.py
-"""Preprocessing functions for Lumi."""
+"""Preprocessing functions for Elowen."""
 
 import json
 import uuid
@@ -22,25 +22,25 @@ from typing import List, Type, Dict
 from pydantic import BaseModel
 
 from dataclasses import dataclass
-from shared.lumi_doc import (
-    LumiDoc,
-    LumiSpan,
-    LumiSummaries,
-    LumiSummary,
+from shared.elowen_doc import (
+    ElowenDoc,
+    ElowenSpan,
+    ElowenSummaries,
+    ElowenSummary,
     ListContent,
-    LumiSection,
-    LumiContent,
+    ElowenSection,
+    ElowenContent,
 )
 from shared import prompt_utils
 import models.gemini as gemini
-from import_pipeline.convert_html_to_lumi import (
+from import_pipeline.convert_html_to_elowen import (
     convert_raw_output_to_spans,
 )
 from shared.utils import get_unique_id
 
 
 @dataclass
-class FetchLumiSummariesRequestOptions:
+class FetchElowenSummariesRequestOptions:
     include_section_summaries: bool = False
     include_content_summaries: bool = False
     include_span_summaries: bool = False
@@ -57,6 +57,12 @@ class LabelSchema(BaseModel):
     label: str
 
 
+class ContentLabelSchema(BaseModel):
+    id: str
+    gist: str
+    purpose: str = ""
+
+
 MIN_CHARACTER_LENGTH = 100
 
 SPAN_SUMMARIES_DEFAULT_BATCH_SIZE = 500
@@ -64,61 +70,61 @@ SECTION_SUMMARIES_DEFAULT_BATCH_SIZE = 50
 CONTENT_SUMMARIES_DEFAULT_BATCH_SIZE = 100
 
 # Shared prompt instructions
-_PROMPT_FORMATTING_INSTRUCTIONS = """You can use markdown for formatting, like <b>bold</b>. For any equations or variables, make sure to use $...$ for any inline math (including \\sqrt)."""
-_PROMPT_JSON_OUTPUT_INSTRUCTIONS = """Please return the list of items and their summaries as a list of JSON objects, each with two fields: id (string) and label (string). Please use double quotes around the key/values and single quotes within the strings."""
+_PROMPT_FORMATTING_INSTRUCTIONS = """可用 markdown 格式，例如 <b>加粗</b>。公式或变量请用 $...$ 包裹（含 \\sqrt）。"""
+_PROMPT_JSON_OUTPUT_INSTRUCTIONS = """请返回 JSON 对象列表，每项两个字段：id（string）和 label（string，简体中文）。键值用双引号，字符串内可用单引号。"""
 
 
-def _create_summary_span(raw_label: str) -> LumiSpan:
-    """Parses a raw string label, potentially with formatting, into a LumiSpan."""
+def _create_summary_span(raw_label: str) -> ElowenSpan:
+    """Parses a raw string label, potentially with formatting, into a ElowenSpan."""
     spans = convert_raw_output_to_spans(raw_label, skip_tokenize=True)
     if spans:
         return spans[0]
 
-    return LumiSpan(
+    return ElowenSpan(
         id=get_unique_id(),
         text=raw_label,
         inner_tags=[],
     )
 
 
-def generate_lumi_summaries(
-    document: LumiDoc,
-    options: FetchLumiSummariesRequestOptions = FetchLumiSummariesRequestOptions(
+def generate_elowen_summaries(
+    document: ElowenDoc,
+    options: FetchElowenSummariesRequestOptions = FetchElowenSummariesRequestOptions(
         include_content_summaries=True,
         include_section_summaries=True,
         include_span_summaries=True,
         include_abstract_excerpt=True,
     ),
-) -> LumiSummaries:
-    """Generates Lumi summaries."""
-    lumi_summaries = LumiSummaries(
+) -> ElowenSummaries:
+    """Generates Elowen summaries."""
+    elowen_summaries = ElowenSummaries(
         section_summaries=[], content_summaries=[], span_summaries=[]
     )
 
     if options.include_section_summaries:
         section_summaries = generate_section_summaries(document)
-        lumi_summaries.section_summaries.extend(section_summaries)
+        elowen_summaries.section_summaries.extend(section_summaries)
 
     if options.include_content_summaries:
         content_summaries = generate_content_summaries(document)
-        lumi_summaries.content_summaries.extend(content_summaries)
+        elowen_summaries.content_summaries.extend(content_summaries)
 
     if options.include_span_summaries:
         span_summaries = generate_span_summaries(document)
-        lumi_summaries.span_summaries.extend(span_summaries)
+        elowen_summaries.span_summaries.extend(span_summaries)
 
     if options.include_abstract_excerpt and document.abstract:
         abstract_excerpt_span_id = _select_abstract_excerpt(document)
-        lumi_summaries.abstract_excerpt_span_id = abstract_excerpt_span_id
+        elowen_summaries.abstract_excerpt_span_id = abstract_excerpt_span_id
 
-    return lumi_summaries
+    return elowen_summaries
 
 
-def _get_all_spans_from_doc(document: LumiDoc) -> List[LumiSpan]:
-    """Extracts all LumiSpan objects from a LumiDoc by iterating through its contents."""
+def _get_all_spans_from_doc(document: ElowenDoc) -> List[ElowenSpan]:
+    """Extracts all ElowenSpan objects from a ElowenDoc by iterating through its contents."""
     all_spans = []
 
-    def _collect_spans_recursive(sections: List[LumiSection]):
+    def _collect_spans_recursive(sections: List[ElowenSection]):
         for section in sections:
             for content in section.contents:
                 all_spans.extend(_get_spans_from_content(content))
@@ -129,15 +135,15 @@ def _get_all_spans_from_doc(document: LumiDoc) -> List[LumiSpan]:
     return all_spans
 
 
-def _get_spans_from_content(content: LumiContent) -> List[LumiSpan]:
-    """Extracts all LumiSpan objects from a LumiContent block."""
+def _get_spans_from_content(content: ElowenContent) -> List[ElowenSpan]:
+    """Extracts all ElowenSpan objects from a ElowenContent block."""
     content_spans = []
     if content.text_content:
         content_spans.extend(content.text_content.spans)
     elif content.list_content:
 
-        def extract_spans_from_list(list_content: ListContent) -> List[LumiSpan]:
-            spans: List[LumiSpan] = []
+        def extract_spans_from_list(list_content: ListContent) -> List[ElowenSpan]:
+            spans: List[ElowenSpan] = []
             for item in list_content.list_items:
                 spans.extend(item.spans)
                 if item.subListContent:
@@ -148,14 +154,14 @@ def _get_spans_from_content(content: LumiContent) -> List[LumiSpan]:
     return content_spans
 
 
-def _get_text_from_content(content: LumiContent) -> str:
-    """Gets the concatenated text from all spans within a LumiContent."""
+def _get_text_from_content(content: ElowenContent) -> str:
+    """Gets the concatenated text from all spans within a ElowenContent."""
     spans = _get_spans_from_content(content)
     return " ".join(span.text for span in spans)
 
 
-def _get_text_from_section(section: LumiSection) -> str:
-    """Gets the concatenated text from all spans within a LumiSection, including sub-sections."""
+def _get_text_from_section(section: ElowenSection) -> str:
+    """Gets the concatenated text from all spans within a ElowenSection, including sub-sections."""
     all_text = []
     for content in section.contents:
         all_text.append(_get_text_from_content(content))
@@ -168,7 +174,7 @@ def _get_text_from_section(section: LumiSection) -> str:
 # ------------------------------------------------------------------------------
 # Abstract Excerpt
 # ------------------------------------------------------------------------------
-def _select_abstract_excerpt_prompt(spans: List[LumiSpan]) -> str:
+def _select_abstract_excerpt_prompt(spans: List[ElowenSpan]) -> str:
     """Generates a prompt to select the most important sentence from an abstract."""
     formatted_spans = prompt_utils.get_formatted_spans_list(spans)
     spans_string = "\n".join(formatted_spans)
@@ -181,12 +187,12 @@ Please return only the 'id' of the most important sentence as a JSON object with
     return prompt
 
 
-def _select_abstract_excerpt(document: LumiDoc) -> str | None:
+def _select_abstract_excerpt(document: ElowenDoc) -> str | None:
     """Identifies the most important sentence from the abstract."""
     if not document.abstract:
         return None
 
-    abstract_spans: List[LumiSpan] = []
+    abstract_spans: List[ElowenSpan] = []
     for content in document.abstract.contents:
         abstract_spans.extend(_get_spans_from_content(content))
 
@@ -208,29 +214,43 @@ def _select_abstract_excerpt(document: LumiDoc) -> str | None:
 # ------------------------------------------------------------------------------
 # Span summaries.
 # ------------------------------------------------------------------------------
-def _generate_span_summaries_prompt(spans: List[LumiSpan]) -> str:
-    """Generates a prompt for sentence labels."""
+def _generate_span_summaries_prompt(spans: List[ElowenSpan]) -> str:
+    """Generates a prompt for sentence role labels (grouped in the UI)."""
     formatted_spans = prompt_utils.get_formatted_spans_list(spans)
 
     spans_string = "\n".join(formatted_spans)
-    prompt = f"""You will be given a list of sentences! Your task is to label each sentence in 1-6 words or less, being as specific as possible. {_PROMPT_FORMATTING_INSTRUCTIONS}
-Here are the sentences:
+    prompt = f"""你将收到若干论文句子。请为每个句子打一个「内容角色」短标签，用于段落侧栏按类合并展示，而不是逐句摘要。
+
+标签规则：
+1. 标签表示该句在论证中的角色，优先从下列类别选取（可略作具体化，仍保持短）：
+   - 背景原因（为何重要、问题从何而来）
+   - 方法策略（做法、算法、公式、步骤）
+   - 定义概念（术语、符号含义）
+   - 对比局限（已有方法不足、挑战）
+   - 结果证据（实验、数据、结论）
+   - 贡献目标（本文要做什么）
+2. 同一话题下语义相近的句子必须使用完全相同的标签文案（逐字相同），以便界面合并成一条。
+3. 每个局部话题通常只需 2–4 个不同标签；严禁给每句造独特短语。
+4. 标签长度 2–8 个汉字，不要句号，不要复述整句内容。
+
+{_PROMPT_FORMATTING_INSTRUCTIONS}
+句子列表：
 {spans_string}
 
-Try to use as specific words as possible. Adjacent sentences that are related can be given the same label if it makes sense.
+请用简体中文作答。
 
 {_PROMPT_JSON_OUTPUT_INSTRUCTIONS}
-           """
+"""
     return prompt
 
 
 def generate_span_summaries(
-    document: LumiDoc,
+    document: ElowenDoc,
     batch_size: int = SPAN_SUMMARIES_DEFAULT_BATCH_SIZE,
-) -> List[LumiSummary]:
+) -> List[ElowenSummary]:
     """Generates sentence labels."""
     spans = _get_all_spans_from_doc(document)
-    all_summaries: List[LumiSummary] = []
+    all_summaries: List[ElowenSummary] = []
 
     prompts = []
     for i in range(0, len(spans), batch_size):
@@ -243,9 +263,9 @@ def generate_span_summaries(
             prompt, response_schema=list[LabelSchema]
         )
         if schema_labels:
-            # Convert from List[LabelSchema] to List[LumiSummary]
+            # Convert from List[LabelSchema] to List[ElowenSummary]
             summaries = [
-                LumiSummary(id=sl.id, summary=_create_summary_span(sl.label))
+                ElowenSummary(id=sl.id, summary=_create_summary_span(sl.label))
                 for sl in schema_labels
             ]
             all_summaries.extend(summaries)
@@ -259,11 +279,11 @@ def generate_span_summaries(
 # ------------------------------------------------------------------------------
 # Section summaries.
 # ------------------------------------------------------------------------------
-def _get_all_sections_with_text(document: LumiDoc) -> List[Dict[str, str]]:
-    """Recursively collects all sections and their text from a LumiDoc."""
+def _get_all_sections_with_text(document: ElowenDoc) -> List[Dict[str, str]]:
+    """Recursively collects all sections and their text from a ElowenDoc."""
     section_data = []
 
-    def _collect_recursive(sections: List[LumiSection]):
+    def _collect_recursive(sections: List[ElowenSection]):
         for section in sections:
             section_data.append(
                 {"id": section.id, "text": _get_text_from_section(section)}
@@ -283,9 +303,11 @@ def _generate_section_summaries_prompt(section_data: List[Dict[str, str]]) -> st
         if len(s["text"]) > MIN_CHARACTER_LENGTH
     ]
     section_string = "\n".join(section_strings)
-    prompt = f"""You will be given a section of a document! Your task is to summarize each section in 4-16 words, being as specific as possible. {_PROMPT_FORMATTING_INSTRUCTIONS}
-Here are the contents:
+    prompt = f"""你将收到论文各章节内容。请为每个章节写一句易懂的简体中文摘要（约 18–40 个汉字）：说明该章主要讲什么、关键贡献或结论是什么，避免过短标签。{_PROMPT_FORMATTING_INSTRUCTIONS}
+章节内容：
 {section_string}
+
+请用简体中文作答。
 
 {_PROMPT_JSON_OUTPUT_INSTRUCTIONS}
 """
@@ -293,11 +315,11 @@ Here are the contents:
 
 
 def generate_section_summaries(
-    document: LumiDoc,
+    document: ElowenDoc,
     batch_size: int = SECTION_SUMMARIES_DEFAULT_BATCH_SIZE,
-) -> List[LumiSummary]:
+) -> List[ElowenSummary]:
     """Generates section labels."""
-    all_summaries: List[LumiSummary] = []
+    all_summaries: List[ElowenSummary] = []
     all_sections_data = _get_all_sections_with_text(document)
 
     for i in range(0, len(all_sections_data), batch_size):
@@ -308,9 +330,9 @@ def generate_section_summaries(
         )
 
         if schema_labels:
-            # Convert from List[LabelSchema] to List[LumiSummary]
+            # Convert from List[LabelSchema] to List[ElowenSummary]
             summaries = [
-                LumiSummary(id=sl.id, summary=_create_summary_span(sl.label))
+                ElowenSummary(id=sl.id, summary=_create_summary_span(sl.label))
                 for sl in schema_labels
             ]
             all_summaries.extend(summaries)
@@ -323,11 +345,11 @@ def generate_section_summaries(
 # ------------------------------------------------------------------------------
 # Content summaries.
 # ------------------------------------------------------------------------------
-def _get_all_contents_with_text(document: LumiDoc) -> List[Dict[str, str]]:
-    """Recursively collects all content blocks and their text from a LumiDoc."""
+def _get_all_contents_with_text(document: ElowenDoc) -> List[Dict[str, str]]:
+    """Recursively collects all content blocks and their text from a ElowenDoc."""
     content_data = []
 
-    def _collect_recursive(sections: List[LumiSection]):
+    def _collect_recursive(sections: List[ElowenSection]):
         for section in sections:
             for content in section.contents:
                 if content.text_content or content.list_content:
@@ -349,36 +371,47 @@ def _get_generate_content_summaries_prompt(content_data: List[Dict[str, str]]) -
         if len(c["text"]) > MIN_CHARACTER_LENGTH
     ]
     content_string = "\n".join(content_strings)
-    prompt = f"""You will be given a list of content! Your task is to summarize each piece of content in 4-16 words, being as specific as possible. {_PROMPT_FORMATTING_INSTRUCTIONS}
-Here are the contents:
+    prompt = f"""你将收到若干论文段落。请为每个段落用简体中文写导读，帮助非专家读者快速理解：
+
+1. gist：这段在讲什么。写 1–2 句完整中文（约 25–60 个汉字），说清对象、做法或结论，避免电报式短语。
+2. purpose：作者写这段的用意。写 1 句完整中文（约 12–28 个汉字），说明修辞角色（如引入问题、铺垫背景、给出定义、描述方法、对比实验、总结贡献等），不要只写两三个字的标签。
+
+要求：
+- 尽量具体，点出关键术语/方法名，但不要逐句翻译整段
+- 不要编造原文没有的信息
+- gist 里可用 <b>关键术语</b> 加粗
+
+{_PROMPT_FORMATTING_INSTRUCTIONS}
+段落内容：
 {content_string}
 
-Try to bold the important words/concepts in the summary.
-
-{_PROMPT_JSON_OUTPUT_INSTRUCTIONS}
+请返回 JSON 对象列表，每项字段：id（string）、gist（string）、purpose（string）。键值用双引号。
 """
     return prompt
 
 
 def generate_content_summaries(
-    document: LumiDoc,
+    document: ElowenDoc,
     batch_size: int = CONTENT_SUMMARIES_DEFAULT_BATCH_SIZE,
-) -> List[LumiSummary]:
+) -> List[ElowenSummary]:
     """Generates content labels."""
-    all_summaries: List[LumiSummary] = []
+    all_summaries: List[ElowenSummary] = []
     all_contents_data = _get_all_contents_with_text(document)
 
     for i in range(0, len(all_contents_data), batch_size):
         batch_data = all_contents_data[i : i + batch_size]
         prompt = _get_generate_content_summaries_prompt(batch_data)
         schema_labels = gemini.call_predict_with_schema(
-            prompt, response_schema=list[LabelSchema]
+            prompt, response_schema=list[ContentLabelSchema]
         )
 
         if schema_labels:
-            # Convert from List[LabelSchema] to List[LumiSummary]
             summaries = [
-                LumiSummary(id=sl.id, summary=_create_summary_span(sl.label))
+                ElowenSummary(
+                    id=sl.id,
+                    summary=_create_summary_span(sl.gist),
+                    purpose=_create_summary_span(sl.purpose),
+                )
                 for sl in schema_labels
             ]
             all_summaries.extend(summaries)

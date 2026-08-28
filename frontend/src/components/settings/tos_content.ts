@@ -18,6 +18,9 @@ import { MobxLitElement } from "@adobe/lit-mobx";
 import { CSSResultGroup, html } from "lit";
 import { customElement } from "lit/decorators.js";
 
+import { core } from "../../core/core";
+import { SettingsService } from "../../services/settings.service";
+import { t } from "../../shared/i18n";
 import { styles } from "./tos_content.scss";
 
 /** TOS content. */
@@ -25,48 +28,44 @@ import { styles } from "./tos_content.scss";
 export class TOSContent extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
+  private readonly settingsService = core.getService(SettingsService);
+
+  private uiLang() {
+    return this.settingsService.responseLanguage.value;
+  }
+
   override render() {
+    const lang = this.uiLang();
     return html`
       <p>
-        Lumi is a research experiment that uses the Gemini API
+        ${t("tos.p1", lang)}
         <a href="https://ai.google.dev/gemini-api/terms" target="_blank">
-          (see Gemini API Terms of Service)</a
+          ${t("tos.p1Link", lang)}</a
         >
-        to annotate and answer questions about arXiv papers.
       </p>
       <p>
-        All queries to the Gemini API, including freeform text sent through
-        Lumi's "smart search" feature, will be logged anonymously, i.e., only
-        the exact text you send—not other information such as location, browser,
-        or device—will be stored. Please do not enter any sensitive or personal
-        information into Lumi. If you would like to request that a query on Lumi
-        be removed from storage, please contact
+        ${t("tos.p2", lang)}
         <a href="mailto:lumi-team@google.com" target="_blank">
           lumi-team@google.com</a
         >
-        and include the full text of that query (which can be found in your
-        search history).
+        ${t("tos.p2After", lang)}
       </p>
+      <p>${t("tos.p3", lang)}</p>
       <p>
-        Your search history (including papers you click on and queries you make
-        in "smart search") is kept in browser storage on your device and can be
-        cleared at any time on the Settings page.
-      </p>
-      <p>
-        This demo was created by
+        ${t("tos.p4Before", lang)}
         <a href="https://pair.withgoogle.com/" target="_blank">
           People and AI Research (PAIR)
         </a>
-        and follows Google's
+        ${t("tos.p4Mid", lang)}
         <a href="https://policies.google.com/privacy" target="_blank">
-          Privacy Policy</a
-        >.
+          ${t("tos.p4Privacy", lang)}</a
+        >${t("tos.p4After", lang)}
       </p>
       <p>
-        Finally, the Lumi code is
-        <a href="http://github.com/pair-code/lumi" target="_blank">
-          available on GitHub</a
-        >.
+        ${t("tos.p5Before", lang)}
+        <a href="https://github.com/AJI1026/Elowen" target="_blank">
+          ${t("tos.p5Link", lang)}</a
+        >${t("tos.p5After", lang)}
       </p>
     `;
   }

@@ -16,15 +16,15 @@
  */
 
 import { Service } from "./service";
-import { Highlight, HighlightColor, LumiDoc } from "../shared/lumi_doc";
+import { Highlight, HighlightColor, ElowenDoc } from "../shared/elowen_doc";
 import { ScrollState } from "../contexts/scroll_context";
 import { HighlightManager } from "../shared/highlight_manager";
 import { CollapseManager } from "../shared/collapse_manager";
-import { LumiDocManager } from "../shared/lumi_doc_manager";
+import { ElowenDocManager } from "../shared/elowen_doc_manager";
 import { action, makeObservable, observable } from "mobx";
 import { HighlightSelection } from "../shared/selection_utils";
 import { HistoryService } from "./history.service";
-import { LUMI_CONCEPT_SPAN_ID_PREFIX, SIDEBAR_TABS } from "../shared/constants";
+import { ELOWEN_CONCEPT_SPAN_ID_PREFIX, SIDEBAR_TABS } from "../shared/constants";
 
 interface SpanFocusOptions {
   color?: HighlightColor;
@@ -43,7 +43,7 @@ interface ServiceProvider {
 export class DocumentStateService extends Service {
   highlightManager?: HighlightManager;
   collapseManager?: CollapseManager;
-  lumiDocManager?: LumiDocManager;
+  elowenDocManager?: ElowenDocManager;
 
   private scrollState?: ScrollState;
 
@@ -52,17 +52,17 @@ export class DocumentStateService extends Service {
     makeObservable(this);
   }
 
-  setDocument(lumiDoc: LumiDoc) {
+  setDocument(elowenDoc: ElowenDoc) {
     this.highlightManager = new HighlightManager();
 
-    this.lumiDocManager = new LumiDocManager(lumiDoc);
-    this.collapseManager = new CollapseManager(this.lumiDocManager);
+    this.elowenDocManager = new ElowenDocManager(elowenDoc);
+    this.collapseManager = new CollapseManager(this.elowenDocManager);
     this.collapseManager.initialize();
   }
 
   clearDocument() {
     this.highlightManager = undefined;
-    this.lumiDocManager = undefined;
+    this.elowenDocManager = undefined;
     this.collapseManager = undefined;
   }
 
@@ -112,7 +112,7 @@ export class DocumentStateService extends Service {
     );
     this.highlightManager.addHighlights(highlights);
 
-    const isConceptId = spanId.includes(LUMI_CONCEPT_SPAN_ID_PREFIX);
+    const isConceptId = spanId.includes(ELOWEN_CONCEPT_SPAN_ID_PREFIX);
     if (isConceptId) {
       this.collapseManager.setSidebarTabSelection(SIDEBAR_TABS.CONCEPTS);
     } else {

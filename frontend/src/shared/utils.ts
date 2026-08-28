@@ -24,8 +24,8 @@ import { v4 as uuidv4 } from "uuid";
 // CONSTANTS
 // ****************************************************************************
 
-/** LumiDocument version (in case LumiDocument object is updated). */
-export const LUMI_DOCUMENT_VERSION = 0;
+/** ElowenDocument version (in case ElowenDocument object is updated). */
+export const ELOWEN_DOCUMENT_VERSION = 0;
 
 // ****************************************************************************
 // TYPES
@@ -40,10 +40,10 @@ export const LUMI_DOCUMENT_VERSION = 0;
 // package (its type is compatible with this type)
 export type UnifiedTimestamp = Omit<Timestamp, "toJSON">;
 
-/** Temporary LumiDocument object. */
-export interface LumiDocument {
+/** Temporary ElowenDocument object. */
+export interface ElowenDocument {
   id: string;
-  versionLumi: number; // use LUMI_DOCUMENT_VERSION
+  versionElowen: number; // use ELOWEN_DOCUMENT_VERSION
   versionArxiv: string; // version from arXiv
   content: string;
   dateCreated: UnifiedTimestamp;
@@ -54,13 +54,13 @@ export interface LumiDocument {
 // FUNCTIONS
 // ****************************************************************************
 
-/** Create new LumiDocument. */
-export function createLumiDocument(
-  config: Partial<LumiDocument> = {}
-): LumiDocument {
+/** Create new ElowenDocument. */
+export function createElowenDocument(
+  config: Partial<ElowenDocument> = {}
+): ElowenDocument {
   return {
     id: config.id ?? generateId(),
-    versionLumi: config.versionLumi ?? LUMI_DOCUMENT_VERSION,
+    versionElowen: config.versionElowen ?? ELOWEN_DOCUMENT_VERSION,
     versionArxiv: config.versionArxiv ?? "",
     content: config.content ?? "",
     dateCreated: config.dateCreated ?? Timestamp.now(),

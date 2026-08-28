@@ -14,7 +14,7 @@
 # ==============================================================================
 import unittest
 from import_pipeline import tokenize
-from shared.lumi_doc import InnerTag, InnerTagName, Position
+from shared.elowen_doc import InnerTag, InnerTagName, Position
 
 
 class TokenizeTest(unittest.TestCase):

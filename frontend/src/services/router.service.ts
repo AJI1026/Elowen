@@ -24,6 +24,7 @@ import { AnalyticsService } from "./analytics.service";
 import { DocumentStateService } from "./document_state.service";
 import { HistoryService } from "./history.service";
 import { HomeService } from "./home.service";
+import { APP_NAME } from "../shared/constants";
 
 interface ServiceProvider {
   analyticsService: AnalyticsService;
@@ -99,7 +100,7 @@ export class RouterService extends Service {
     const prevDocId = this.activeRoute.params["document_id"];
     const nextDocId = routeChange.route.params["document_id"];
 
-    const newTitle = nextDocId ? `Lumi - ${nextDocId}` : "Lumi";
+    const newTitle = nextDocId ? `${APP_NAME} - ${nextDocId}` : APP_NAME;
     document.title = newTitle;
 
     if (prevDocId !== nextDocId) {
@@ -211,8 +212,8 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-/** Utils function to get Lumi document URL. */
-export function getLumiPaperUrl(paperId: string) {
+/** Utils function to get Elowen document URL. */
+export function getElowenPaperUrl(paperId: string) {
   const loc = window.location;
   return `${loc.protocol}//${loc.host}/#/${ARXIV_DOCS_ROUTE_NAME}/${paperId}`;
 }

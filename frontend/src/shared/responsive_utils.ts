@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-import { VIEWPORT_SMALL_MAX_HEIGHT } from "./constants";
+import { VIEWPORT_SMALL_MAX_WIDTH } from "./constants";
 
 export function isViewportSmall() {
-  return window.innerWidth < VIEWPORT_SMALL_MAX_HEIGHT;
+  return window.innerWidth < VIEWPORT_SMALL_MAX_WIDTH;
 }

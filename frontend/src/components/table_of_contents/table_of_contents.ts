@@ -19,22 +19,22 @@ import { MobxLitElement } from "@adobe/lit-mobx";
 import { CSSResultGroup, html, HTMLTemplateResult, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { styles } from "./table_of_contents.scss";
-import { LumiSection, LumiSpan, LumiSummaries } from "../../shared/lumi_doc";
+import { ElowenSection, ElowenSpan, ElowenSummaries } from "../../shared/elowen_doc";
 import { classMap } from "lit/directives/class-map.js";
-import { LumiSummaryMaps } from "../../shared/lumi_summary_maps";
+import { ElowenSummaryMaps } from "../../shared/elowen_summary_maps";
 
 @customElement("table-of-contents")
 export class TableOfContents extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
-  @property({ type: Array }) sections: LumiSection[] = [];
-  @property({ type: Object }) lumiSummariesMap?: LumiSummaryMaps;
+  @property({ type: Array }) sections: ElowenSection[] = [];
+  @property({ type: Object }) elowenSummariesMap?: ElowenSummaryMaps;
   @property({ attribute: false }) onSectionClicked: (
     sectionId: string
   ) => void = () => {};
 
   private renderSections(
-    sections: LumiSection[]
+    sections: ElowenSection[]
   ): HTMLTemplateResult | typeof nothing {
     if (!sections || sections.length === 0) {
       return nothing;
@@ -42,7 +42,7 @@ export class TableOfContents extends MobxLitElement {
 
     return html`
       <ul class="toc-list">
-        ${sections.map((section: LumiSection) => {
+        ${sections.map((section: ElowenSection) => {
           const listClasses = {
             ["level"]: true,
           };
@@ -52,7 +52,7 @@ export class TableOfContents extends MobxLitElement {
             [`level-${section.heading.headingLevel}`]: true,
           };
 
-          const summary = this.lumiSummariesMap?.sectionSummariesMap.get(
+          const summary = this.elowenSummariesMap?.sectionSummariesMap.get(
             section.id
           );
 
@@ -75,11 +75,11 @@ export class TableOfContents extends MobxLitElement {
     `;
   }
 
-  private renderSummarySpan(span?: LumiSpan) {
+  private renderSummarySpan(span?: ElowenSpan) {
     if (!span) return nothing;
 
     return html`
-      <lumi-span class="item-summary" .span=${span}></lumi-span>
+      <elowen-span class="item-summary" .span=${span}></elowen-span>
     `;
   }
 

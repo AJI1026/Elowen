@@ -27,7 +27,7 @@ import pypdfium2 as pdfium
 from firebase_admin import storage
 
 from shared.types import ImageMetadata
-from shared.lumi_doc import ImageContent
+from shared.elowen_doc import ImageContent
 
 # TODO(ellenj): Update this eventually to save to the google cloud bucket.
 LOCAL_IMAGE_BUCKET_BASE = "../local_image_bucket/"

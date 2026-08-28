@@ -20,11 +20,11 @@ import * as sinon from "sinon";
 
 import { HistoryService } from "./history.service";
 import { LocalStorageService } from "./local_storage.service";
-import { LumiAnswer } from "../shared/api";
+import { ElowenAnswer } from "../shared/api";
 import { PaperData } from "../shared/types_local_storage";
-import { ArxivMetadata } from "../shared/lumi_doc";
+import { ArxivMetadata } from "../shared/elowen_doc";
 
-const PAPER_KEY_PREFIX = "lumi-paper:";
+const PAPER_KEY_PREFIX = "elowen-paper:";
 
 describe("HistoryService", () => {
   let historyService: HistoryService;
@@ -54,7 +54,7 @@ describe("HistoryService", () => {
     status: "complete",
     addedTimestamp: Date.now(),
   };
-  const mockAnswer: LumiAnswer = {
+  const mockAnswer: ElowenAnswer = {
     id: "answer1",
     request: { query: "test query" },
     responseContent: [],
@@ -163,6 +163,28 @@ describe("HistoryService", () => {
       ).to.be.true;
     });
 
+    it("should clear answer highlights when deleting a paper", () => {
+      const answerWithHighlight: ElowenAnswer = {
+        ...mockAnswer,
+        request: {
+          query: "test query",
+          highlightedSpans: [{ spanId: "span-1" }],
+        },
+      };
+      mockLocalStorageService.getData.returns(mockPaper1);
+      historyService.addAnswer("doc1", answerWithHighlight);
+      expect(
+        historyService.answerHighlightManager.getSpanHighlights("span-1")
+      ).to.have.lengthOf(1);
+
+      historyService.deletePaper("doc1");
+
+      expect(historyService.getAnswers("doc1")).to.deep.equal([]);
+      expect(
+        historyService.answerHighlightManager.getSpanHighlights("span-1")
+      ).to.be.empty;
+    });
+
     it("should clear all history", () => {
       const key1 = `${PAPER_KEY_PREFIX}doc1`;
       mockLocalStorageService.listKeys.returns([key1]);
@@ -200,6 +222,17 @@ describe("HistoryService", () => {
       expect(mockLocalStorageService.setData.called).to.be.true;
       const updatedPaper = mockLocalStorageService.setData.firstCall.args[1];
       expect((updatedPaper as PaperData).history).to.deep.equal([mockAnswer]);
+    });
+
+    it("should remove an answer from the correct paper", () => {
+      mockLocalStorageService.getData.returns(mockPaper1);
+      historyService.addAnswer("doc1", mockAnswer);
+
+      historyService.removeAnswer("doc1", mockAnswer.id);
+
+      expect(historyService.getAnswers("doc1")).to.deep.equal([]);
+      const updatedPaper = mockLocalStorageService.setData.lastCall.args[1];
+      expect((updatedPaper as PaperData).history).to.deep.equal([]);
     });
   });
 
@@ -248,7 +281,7 @@ describe("HistoryService", () => {
     });
 
     it("should remove a specific temporary answer", () => {
-      const answer2: LumiAnswer = { ...mockAnswer, id: "answer2" };
+      const answer2: ElowenAnswer = { ...mockAnswer, id: "answer2" };
       historyService.temporaryAnswers = [mockAnswer, answer2];
       historyService.removeTemporaryAnswer("answer1");
       expect(historyService.temporaryAnswers).to.have.lengthOf(1);

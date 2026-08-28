@@ -15,6 +15,7 @@
  */
 
 import { GitRevisionPlugin } from "git-revision-webpack-plugin";
+import CopyWebpackPlugin from "copy-webpack-plugin";
 import HtmlWebpackPlugin from "html-webpack-plugin";
 import * as path from "path";
 import * as webpack from "webpack";
@@ -58,9 +59,28 @@ const config: webpack.Configuration = {
     new HtmlWebpackPlugin({
       template: "./index.html",
       filename: "index.html",
-      favicon: "./favicon.png",
+      favicon: "./favicon.svg",
       // Prepend an optional prefix path to the base URL of referenced assets in index.html
       base: process.env.URL_PREFIX ?? "/",
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: path.resolve(__dirname, "../assets/questions_tutorial.png"),
+          to: "assets/questions_tutorial.png",
+        },
+        {
+          from: path.resolve(
+            __dirname,
+            "../assets/questions_image_tutorial.png"
+          ),
+          to: "assets/questions_image_tutorial.png",
+        },
+        {
+          from: path.resolve(__dirname, "favicon.svg"),
+          to: "favicon.svg",
+        },
+      ],
     }),
     new webpack.DefinePlugin({
       "process.env.URL_PREFIX": process.env.URL_PREFIX ?? "'/'",

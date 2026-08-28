@@ -17,12 +17,12 @@
 
 import { expect } from "@esm-bundle/chai";
 import { CollapseManager } from "./collapse_manager";
-import { LumiDoc, LumiSection } from "./lumi_doc";
-import { LumiDocManager } from "./lumi_doc_manager";
+import { ElowenDoc, ElowenSection } from "./elowen_doc";
+import { ElowenDocManager } from "./elowen_doc_manager";
 import { SIDEBAR_TABS } from "./constants";
 
 // Mocks
-const mockLumiDoc: LumiDoc = {
+const mockElowenDoc: ElowenDoc = {
   markdown: "",
   abstract: { contents: [] },
   sections: [
@@ -78,11 +78,11 @@ const mockLumiDoc: LumiDoc = {
 
 describe("CollapseManager", () => {
   let collapseManager: CollapseManager;
-  let lumiDocManager: LumiDocManager;
+  let elowenDocManager: ElowenDocManager;
 
   beforeEach(() => {
-    lumiDocManager = new LumiDocManager(mockLumiDoc);
-    collapseManager = new CollapseManager(lumiDocManager);
+    elowenDocManager = new ElowenDocManager(mockElowenDoc);
+    collapseManager = new CollapseManager(elowenDocManager);
   });
 
   it("should be created", () => {

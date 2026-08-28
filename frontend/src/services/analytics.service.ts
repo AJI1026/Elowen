@@ -29,7 +29,7 @@ export enum AnalyticsAction {
   // home
   HOME_HEADER_FEEDBACK_CLICK = "home_header_feedback_click",
 
-  // lumi_reader
+  // elowen_reader
   READER_TEXT_SELECTION = "reader_text_selection",
   READER_CONCEPT_CLICK = "reader_concept_click",
   READER_IMAGE_CLICK = "reader_image_click",
@@ -43,7 +43,7 @@ export enum AnalyticsAction {
   SIDEBAR_HEADER_HISTORY_CLICK = "sidebar_header_history_click",
   SIDEBAR_HEADER_TUTORIAL_CLICK = "sidebar_header_tutorial_click",
 
-  // lumi_questions
+  // elowen_questions
   QUESTIONS_DISMISS_ANSWER = "questions_dismiss_answer",
   QUESTIONS_SEE_ALL_CLICK = "questions_see_all_click",
   QUESTIONS_BACK_CLICK = "questions_back_click",
@@ -54,6 +54,8 @@ export enum AnalyticsAction {
   MENU_EXPLAIN_CLICK = "menu_explain_click",
   MENU_ASK_CLICK = "menu_ask_click",
   MENU_SEND_QUERY = "menu_send_query",
+  MENU_MINDMAP_CLICK = "menu_mindmap_click",
+  QUESTIONS_MINDMAP_CLICK = "questions_mindmap_click",
 
   // sidebar_header
   HEADER_NAVIGATE_HOME = "header_navigate_home",

@@ -23,8 +23,8 @@ CONCEPT_EXTRACTION_PROMPT = f"""You are an expert academic assistant tasked with
     a list of concept objects. Each concept object must have 'name' and 'contents'.
     The 'contents' field should be a list of two objects.
 
-    - The first content object MUST have a `label` of "{CONCEPT_CONTENT_LABEL_DEFINITION}" and a `value` containing a concise, general definition of the concept (8-16 words).
-    - The second content object MUST have a `label` of "{CONCEPT_CONTENT_LABEL_RELEVANCE}" and a `value` explaining why this concept is important in the context of this specific paper.
+    - The first content object MUST have a `label` of "{CONCEPT_CONTENT_LABEL_DEFINITION}" and a `value` containing a clear general definition of the concept in 1-2 sentences (about 20-45 words), suitable for a non-expert reader.
+    - The second content object MUST have a `label` of "{CONCEPT_CONTENT_LABEL_RELEVANCE}" and a `value` explaining why this concept is important in the context of this specific paper (1-2 sentences).
 
     DO NOT include 'id' or 'in_text_citations' in your JSON output; these will be
     handled by the downstream parsing script.

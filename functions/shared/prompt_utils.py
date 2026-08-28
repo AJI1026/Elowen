@@ -19,7 +19,7 @@
 import json
 from typing import Any, Dict, List, Sequence
 
-from shared.lumi_doc import LumiSpan, Label, LumiDoc, LumiContent
+from shared.elowen_doc import ElowenSpan, Label, ElowenDoc, ElowenContent
 from shared.string_utils import extract_json_from_decorator
 
 
@@ -60,7 +60,7 @@ def get_labels_from_response(
 
 
 def get_formatted_spans_list(
-    spans: List[LumiSpan],
+    spans: List[ElowenSpan],
 ) -> List[str]:
     """Generates a string of the spans."""
     formatted_spans = [
@@ -70,8 +70,8 @@ def get_formatted_spans_list(
     return formatted_spans
 
 
-def _extract_spans_from_list(list_content) -> List[LumiSpan]:
-    spans: List[LumiSpan] = []
+def _extract_spans_from_list(list_content) -> List[ElowenSpan]:
+    spans: List[ElowenSpan] = []
     for item in list_content.list_items:
         spans.extend(item.spans)
         if item.subListContent:
@@ -79,9 +79,9 @@ def _extract_spans_from_list(list_content) -> List[LumiSpan]:
     return spans
 
 
-def _extract_spans_from_content(content: LumiContent) -> List[LumiSpan]:
-    """Extracts spans from a single LumiContent object."""
-    spans: List[LumiSpan] = []
+def _extract_spans_from_content(content: ElowenContent) -> List[ElowenSpan]:
+    """Extracts spans from a single ElowenContent object."""
+    spans: List[ElowenSpan] = []
     if content.text_content:
         spans.extend(content.text_content.spans)
     elif content.list_content:
@@ -97,9 +97,9 @@ def _extract_spans_from_content(content: LumiContent) -> List[LumiSpan]:
     return spans
 
 
-def get_all_spans_from_doc(document: LumiDoc) -> List[LumiSpan]:
-    """Extracts all LumiSpan objects from a LumiDoc by iterating through its contents."""
-    all_spans: List[LumiSpan] = []
+def get_all_spans_from_doc(document: ElowenDoc) -> List[ElowenSpan]:
+    """Extracts all ElowenSpan objects from a ElowenDoc by iterating through its contents."""
+    all_spans: List[ElowenSpan] = []
 
     def _extract_spans_from_sections(sections):
         for section in sections:
@@ -123,3 +123,20 @@ def get_all_spans_from_doc(document: LumiDoc) -> List[LumiSpan]:
             all_spans.append(footnote.span)
 
     return all_spans
+
+
+def get_response_language_instruction(model_config: dict | None) -> str:
+    """Returns a prompt suffix instructing the model which language to use."""
+    if not model_config:
+        return ""
+    lang = model_config.get("responseLanguage") or model_config.get(
+        "response_language"
+    )
+    if lang == "zh":
+        return (
+            "\n\nIMPORTANT: Write your entire response in Simplified Chinese "
+            "(简体中文). Use Chinese even when defining English technical terms."
+        )
+    if lang == "en":
+        return "\n\nIMPORTANT: Write your entire response in English."
+    return ""

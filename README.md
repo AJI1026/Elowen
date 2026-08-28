@@ -1,24 +1,34 @@
-# Welcome to Lumi
+# Welcome to Elowen
 
-[Lumi](https://lumi.withgoogle.com) uses AI to help you quickly read and understand [arXiv papers](https://arxiv.org/). Features include:
+[Elowen](https://lumi.withgoogle.com) uses AI to help you quickly read and understand [arXiv papers](https://arxiv.org/). Features include:
 
 - ✏️ **AI-augmented annotations** - read summaries at multiple granularities
 - 🔖 **Smart highlights** - highlight text + ask questions
-- 🖼️ **Figure explanations** - ask Lumi about images in the paper
+- 🖼️ **Figure explanations** - ask Elowen about images in the paper
 
-[Demo](https://lumi.withgoogle.com) | [Medium article](https://medium.com/people-ai-research/read-smarter-not-harder-with-lumi-6a1a8210ccc7) | [GitHub discussions](https://github.com/PAIR-code/lumi/discussions)
+[Demo](https://lumi.withgoogle.com) | [Medium article](https://medium.com/people-ai-research/read-smarter-not-harder-with-elowen-6a1a8210ccc7) | [GitHub](https://github.com/AJI1026/Elowen)
 
-<img src="assets/combined_desktop_mobile.png" alt-text="Screenshots of Lumi desktop and mobile views" height="400" />
+<img src="assets/combined_desktop_mobile.png" alt-text="Screenshots of Elowen desktop and mobile views" height="400" />
 
-*Please note that Lumi can only currently process arXiv papers under a Creative Commons license.*
+*Please note that Elowen can only currently process arXiv papers under a Creative Commons license.*
 
-## Running Lumi locally
+## Running Elowen locally
 
 ### Set up Firebase functions and emulators
 
 Follow instructions in
-[`functions/README.md`](https://github.com/PAIR-code/lumi/tree/main/functions)
+[`functions/README.md`](./functions/README.md)
 to install relevant dependencies and run local emulators.
+
+Server-side model and API key (paper import, PDF formatting, etc.) live in the
+local file `functions/models/api_config.py` (copy from
+`api_config.example.py`; the real file is gitignored). You can also override
+them with `ELOWEN_MODEL_PROVIDER`, `ELOWEN_MODEL_NAME`,
+`ELOWEN_MODEL_NAME_STRONG`, `ELOWEN_API_KEY`, and `ELOWEN_BASE_URL`. See
+`functions/README.md` for details.
+
+The API key in the web app Settings page is separate: it is stored in the
+browser and used for in-paper Ask / highlights, not for server import.
 
 ### Start frontend web app
 
@@ -40,7 +50,7 @@ Then, view the app at http://localhost:4201.
 
 ### Storybook stories
 
-To view [Storybook](https://storybook.js.org/docs) stories for Lumi:
+To view [Storybook](https://storybook.js.org/docs) stories for Elowen:
 
 ```
 npm run storybook
@@ -53,10 +63,10 @@ Then, view the stories at http://localhost:6006.
 The import script in `scripts/import_papers_local.py` can be used to import a
 set of papers for local debugging.
 
-The locally imported papers can be rendered in `lumi_doc.stories.ts`
+The locally imported papers can be rendered in `elowen_doc.stories.ts`
 via Storybook.
 
-## Deploying the Lumi app
+## Deploying the Elowen app
 
 To deploy the web app via App Engine, add an
 [app.yaml](https://cloud.google.com/appengine/docs/standard/reference/app-yaml?tab=node.js)
@@ -84,14 +94,14 @@ limitations under those licenses.
 
 This is not an official Google product.
 
-Lumi is a research project under active development by a small
+Elowen is a research project under active development by a small
 team. If you have suggestions or feedback, feel free to
-[submit an issue](https://github.com/pair-code/lumi/issues).
+[submit an issue](https://github.com/AJI1026/Elowen/issues).
 
 Copyright 2025 DeepMind Technologies Limited.
 
 ## Acknowledgments
 
-Lumi was designed and built by Ellen Jiang, Vivian Tsai, and Nada Hussein.
+Elowen was designed and built by Ellen Jiang, Vivian Tsai, and Nada Hussein.
 
 Special thanks to Andy Coenen, James Wexler, Tianchang He, Mahima Pushkarna, Michael Xieyang Liu, Alejandra Molina, Aaron Donsbach, Martin Wattenberg, Fernanda Viégas, Michael Terry, and Lucas Dixon for making this experiment possible!

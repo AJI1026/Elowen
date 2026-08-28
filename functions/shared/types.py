@@ -21,11 +21,11 @@ from dataclasses import dataclass
 
 class LoadingStatus(StrEnum):
     """
-    An enumeration to represent various loading states while importing a LumiDoc.
+    An enumeration to represent various loading states while importing a ElowenDoc.
     """
 
     UNSET = "UNSET"
-    WAITING = "WAITING"  # Importing paper into LumiDoc
+    WAITING = "WAITING"  # Importing paper into ElowenDoc
     SUMMARIZING = "SUMMARIZING"  # Loading summaries after paper is imported
     SUCCESS = "SUCCESS"
     ERROR_DOCUMENT_LOAD = "ERROR_DOCUMENT_LOAD"
@@ -37,7 +37,7 @@ class LoadingStatus(StrEnum):
     TIMEOUT = "TIMEOUT"
 
 
-# Kept in sync with shared/lumi_doc.ts
+# Kept in sync with shared/elowen_doc.ts
 @dataclass
 class FeaturedImage:
     """Class for featured image."""

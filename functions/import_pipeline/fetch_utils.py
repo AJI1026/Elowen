@@ -22,7 +22,7 @@ import xml.etree.ElementTree as ET
 from shared import string_utils
 from shared.types import ArxivMetadata
 
-_ARXIV_USER_AGENT = "Lumi/1.0 (+https://lumi.withgoogle.com)"
+_ARXIV_USER_AGENT = "Elowen/1.0 (+https://lumi.withgoogle.com)"
 _ARXIV_REQUEST_TIMEOUT_SECONDS = 15
 _ARXIV_MAX_RETRIES = 3
 _ARXIV_RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504}

@@ -14,14 +14,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { ArxivMetadata } from "./lumi_doc";
-import { LumiAnswer } from "./api";
+import { ArxivMetadata, HighlightColor } from "./elowen_doc";
+import { ElowenAnswer } from "./api";
+import { HighlightSelection } from "./selection_utils";
+
+/** A user-created highlight or note on a document. */
+export interface UserAnnotation {
+  id: string;
+  selectedText: string;
+  highlightedSpans: HighlightSelection[];
+  note?: string;
+  color: HighlightColor;
+  createdAt: number;
+}
 
 /** Local Storage State */
 export interface PaperData {
   metadata: ArxivMetadata;
-  history: LumiAnswer[];
-  personalSummary?: LumiAnswer;
+  history: ElowenAnswer[];
+  personalSummary?: ElowenAnswer;
+  annotations?: UserAnnotation[];
   status: "loading" | "complete";
   addedTimestamp?: number;
 }

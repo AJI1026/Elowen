@@ -25,12 +25,12 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { ArxivCollection } from "../shared/lumi_collection";
+import { ArxivCollection } from "../shared/elowen_collection";
 import {
   ArxivMetadata,
   FeaturedImage,
   MetadataCollectionItem,
-} from "../shared/lumi_doc";
+} from "../shared/elowen_doc";
 
 import { FirebaseService } from "./firebase.service";
 import { HistoryService } from "./history.service";

@@ -26,15 +26,17 @@ import { styles } from "./answer_highlight_tooltip.scss";
 import { core } from "../../core/core";
 import { DocumentStateService } from "../../services/document_state.service";
 import { HistoryService } from "../../services/history.service";
-import { LumiAnswer } from "../../shared/api";
+import { SettingsService } from "../../services/settings.service";
+import { ElowenAnswer } from "../../shared/api";
 
-import { LumiContent } from "../../shared/lumi_doc";
+import { ElowenContent } from "../../shared/elowen_doc";
 import { classMap } from "lit/directives/class-map.js";
+import { t } from "../../shared/i18n";
 
-import "../lumi_content/lumi_content";
+import "../elowen_content/elowen_content";
 
 /**
- * A tooltip that displays the content of a LumiAnswer.
+ * A tooltip that displays the content of a ElowenAnswer.
  */
 @customElement("answer-highlight-tooltip")
 export class AnswerHighlightTooltip extends MobxLitElement {
@@ -46,9 +48,10 @@ export class AnswerHighlightTooltip extends MobxLitElement {
   private documentStateService = core.getService(DocumentStateService);
   private historyService = core.getService(HistoryService);
   private floatingPanelService = core.getService(FloatingPanelService);
+  private settingsService = core.getService(SettingsService);
 
   private readonly handleAnswerHighlightClick = (
-    answer: LumiAnswer,
+    answer: ElowenAnswer,
     target: HTMLElement
   ) => {
     const props = new AnswerHighlightTooltipProps(answer);
@@ -69,28 +72,32 @@ export class AnswerHighlightTooltip extends MobxLitElement {
   override render(): TemplateResult {
     const allContent = this.props.answer.responseContent;
     if (!allContent || allContent.length === 0) {
-      return html`<div>No content to display.</div>`;
+      return html`<div>${t(
+        "tooltip.noContent",
+        this.settingsService.responseLanguage.value
+      )}</div>`;
     }
 
     const contentToShow = this.showAll ? allContent : allContent.slice(0, 1);
     const hasMoreContent = allContent.length > 1;
 
-    const renderItem = (content: LumiContent) =>
-      html`<lumi-content
+    const renderItem = (content: ElowenContent) =>
+      html`<elowen-content
         .content=${content}
-        .references=${this.documentStateService.lumiDocManager?.lumiDoc
+        .references=${this.documentStateService.elowenDocManager?.elowenDoc
           .references}
         .summary=${null}
         .spanSummaries=${new Map()}
         .focusedSpanId=${null}
         .highlightManager=${this.documentStateService.highlightManager!}
         .answerHighlightManager=${this.historyService.answerHighlightManager!}
+        .userHighlightManager=${this.historyService.userHighlightManager!}
         .collapseManager=${this.documentStateService.collapseManager!}
         .onSpanSummaryMouseEnter=${() => {}}
         .onSpanSummaryMouseLeave=${() => {}}
         .onAnswerHighlightClick=${this.handleAnswerHighlightClick.bind(this)}
         .dense=${true}
-      ></lumi-content>`;
+      ></elowen-content>`;
 
     const showButton = hasMoreContent && !this.showAll;
 
@@ -104,7 +111,10 @@ export class AnswerHighlightTooltip extends MobxLitElement {
         ${this.renderQuery()} ${contentToShow.map(renderItem.bind(this))}
         ${showButton
           ? html`<pr-icon-button
-              title="See more"
+              title=${t(
+                "content.seeMore",
+                this.settingsService.responseLanguage.value
+              )}
               icon="more_horiz"
               variant="default"
               class="show-more-button"

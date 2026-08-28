@@ -31,8 +31,8 @@ export const BANNER_HEIGHT = 40;
 /**
  * Renders a banner.
  */
-@customElement("lumi-banner")
-export class LumiBanner extends MobxLitElement {
+@customElement("elowen-banner")
+export class ElowenBanner extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
   @property({ type: String }) text: string | string[] = "";
@@ -100,6 +100,6 @@ export class LumiBanner extends MobxLitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "lumi-banner": LumiBanner;
+    "elowen-banner": ElowenBanner;
   }
 }

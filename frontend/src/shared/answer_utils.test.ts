@@ -17,7 +17,7 @@
 
 import { expect } from "@esm-bundle/chai";
 import * as sinon from "sinon";
-import { LumiAnswerRequest } from "./api";
+import { ElowenAnswerRequest } from "./api";
 import { createTemporaryAnswer } from "./answer_utils";
 
 describe("createTemporaryAnswer", () => {
@@ -34,7 +34,7 @@ describe("createTemporaryAnswer", () => {
   });
 
   it("should create a temporary answer with the correct properties", () => {
-    const request: LumiAnswerRequest = {
+    const request: ElowenAnswerRequest = {
       query: "What is a neural network?",
     };
 
@@ -52,7 +52,7 @@ describe("createTemporaryAnswer", () => {
       position: { startIndex: 0, endIndex: 4 },
       spanId: "p1",
     };
-    const request: LumiAnswerRequest = {
+    const request: ElowenAnswerRequest = {
       query: "Tell me more about this.",
       highlight: "this",
       highlightedSpans: [highlight],

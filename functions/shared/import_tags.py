@@ -15,7 +15,7 @@
 """A single source of truth for all import tags and regex patterns."""
 
 import re
-from shared.lumi_doc import InnerTagName
+from shared.elowen_doc import InnerTagName
 
 # ==============================================================================
 # Section Tags

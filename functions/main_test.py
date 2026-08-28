@@ -29,12 +29,12 @@ with patch("firebase_admin.initialize_app"):
     from main import (
         get_personal_summary,
         get_arxiv_metadata,
-        get_lumi_response,
+        get_elowen_response,
         request_arxiv_doc_import,
         save_user_feedback,
     )
 import main_testing_utils
-from shared.api import LumiAnswer, LumiAnswerRequest, UserFeedback
+from shared.api import ElowenAnswer, ElowenAnswerRequest, UserFeedback
 from shared.json_utils import convert_keys
 from shared.types import ArxivMetadata, MetadataCollectionItem
 from shared.types_local_storage import PaperData
@@ -52,16 +52,16 @@ class TestMainGetPersonalSummary(unittest.TestCase):
     @patch("main.personal_summary")
     def test_get_personal_summary(self, mock_summary_module):
         # Arrange: Mock the business logic to return a dataclass instance.
-        mock_summary_object = LumiAnswer(
+        mock_summary_object = ElowenAnswer(
             id="summary1",
-            request=LumiAnswerRequest(query="personal summary"),
+            request=ElowenAnswerRequest(query="personal summary"),
             response_content=[],
             timestamp=123,
         )
         mock_summary_module.get_personal_summary.return_value = mock_summary_object
 
         # Arrange: Create realistic data objects.
-        mock_doc_obj = main_testing_utils.create_mock_lumidoc()
+        mock_doc_obj = main_testing_utils.create_mock_elowendoc()
         mock_past_papers = main_testing_utils.create_mock_paper_data()
 
         # Arrange: Convert dataclasses to camelCase JSON, simulating the client payload.
@@ -96,28 +96,28 @@ class TestMainGetPersonalSummary(unittest.TestCase):
         self.assertEqual(response_data["result"], expected_result)
 
 
-class TestMainGetLumiResponse(unittest.TestCase):
+class TestMainGetElowenResponse(unittest.TestCase):
 
     @patch("firebase_admin.initialize_app")
     def setUp(self, initialize_app_mock):
-        self.lumi_response_client = create_app(
-            "get_lumi_response", "main.py"
+        self.elowen_response_client = create_app(
+            "get_elowen_response", "main.py"
         ).test_client()
 
     @patch("main.datetime")
     @patch("main.firestore")
     @patch("main.answers")
-    def test_get_lumi_response(self, mock_answers_module, mock_firestore, mock_datetime):
+    def test_get_elowen_response(self, mock_answers_module, mock_firestore, mock_datetime):
         # Arrange: Mock datetime.now to return a fixed time for deterministic testing.
         fixed_now = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
         mock_datetime.now.return_value = fixed_now
 
-        # Arrange: Mock the business logic to return a LumiAnswer instance.
-        mock_request_obj = LumiAnswerRequest(query="What is the abstract?")
-        mock_answer_obj = LumiAnswer(
+        # Arrange: Mock the business logic to return a ElowenAnswer instance.
+        mock_request_obj = ElowenAnswerRequest(query="What is the abstract?")
+        mock_answer_obj = ElowenAnswer(
             id="answer1", request=mock_request_obj, response_content=[], timestamp=456
         )
-        mock_answers_module.generate_lumi_answer.return_value = mock_answer_obj
+        mock_answers_module.generate_elowen_answer.return_value = mock_answer_obj
 
         # Arrange: Mock Firestore client
         mock_db = MagicMock()
@@ -126,7 +126,7 @@ class TestMainGetLumiResponse(unittest.TestCase):
         mock_db.collection.return_value = mock_collection
 
         # Arrange: Create mock data objects.
-        mock_doc_obj = main_testing_utils.create_mock_lumidoc()
+        mock_doc_obj = main_testing_utils.create_mock_elowendoc()
 
         # Arrange: Convert dataclasses to camelCase JSON for the payload.
         doc_dict = convert_keys(asdict(mock_doc_obj), "snake_to_camel")
@@ -134,7 +134,7 @@ class TestMainGetLumiResponse(unittest.TestCase):
         payload = {"doc": doc_dict, "request": request_dict, "apiKey": ""}
 
         # Act: Send a POST request to the test client.
-        response = self.lumi_response_client.post("/", json={"data": payload})
+        response = self.elowen_response_client.post("/", json={"data": payload})
 
         # Assert: Check for a successful response.
         self.assertEqual(
@@ -145,7 +145,7 @@ class TestMainGetLumiResponse(unittest.TestCase):
 
         # Assert: Check that the business logic was called with the correct, deserialized objects.
         # Using ANY for the doc object as it's deserialized into a new instance.
-        mock_answers_module.generate_lumi_answer.assert_called_once_with(
+        mock_answers_module.generate_elowen_answer.assert_called_once_with(
             ANY, mock_request_obj, ""
         )
 
@@ -169,16 +169,16 @@ class TestMainGetLumiResponse(unittest.TestCase):
         }
         mock_collection.add.assert_called_once_with(expected_log_data)
 
-    def test_get_lumi_response_query_too_long(self):
+    def test_get_elowen_response_query_too_long(self):
         # Arrange
-        mock_doc_obj = main_testing_utils.create_mock_lumidoc()
-        mock_request_obj = LumiAnswerRequest(query="a" * 2000)  # Exceeds max length
+        mock_doc_obj = main_testing_utils.create_mock_elowendoc()
+        mock_request_obj = ElowenAnswerRequest(query="a" * 2000)  # Exceeds max length
         doc_dict = convert_keys(asdict(mock_doc_obj), "snake_to_camel")
         request_dict = convert_keys(asdict(mock_request_obj), "snake_to_camel")
         payload = {"doc": doc_dict, "request": request_dict}
 
         # Act
-        response = self.lumi_response_client.post("/", json={"data": payload})
+        response = self.elowen_response_client.post("/", json={"data": payload})
 
         # Assert
         self.assertEqual(response.status_code, 400)
@@ -187,10 +187,10 @@ class TestMainGetLumiResponse(unittest.TestCase):
         self.assertEqual(response_data["error"]["status"], "INVALID_ARGUMENT")
         self.assertIn("Query exceeds max length", response_data["error"]["message"])
 
-    def test_get_lumi_response_highlight_too_long(self):
+    def test_get_elowen_response_highlight_too_long(self):
         # Arrange
-        mock_doc_obj = main_testing_utils.create_mock_lumidoc()
-        mock_request_obj = LumiAnswerRequest(
+        mock_doc_obj = main_testing_utils.create_mock_elowendoc()
+        mock_request_obj = ElowenAnswerRequest(
             highlight="a" * 100001
         )  # Exceeds max length
         doc_dict = convert_keys(asdict(mock_doc_obj), "snake_to_camel")
@@ -198,7 +198,7 @@ class TestMainGetLumiResponse(unittest.TestCase):
         payload = {"doc": doc_dict, "request": request_dict}
 
         # Act
-        response = self.lumi_response_client.post("/", json={"data": payload})
+        response = self.elowen_response_client.post("/", json={"data": payload})
 
         # Assert
         self.assertEqual(response.status_code, 400)

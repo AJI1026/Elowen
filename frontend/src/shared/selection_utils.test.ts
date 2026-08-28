@@ -19,11 +19,58 @@ import { expect } from "@esm-bundle/chai";
 import { fixture, html } from "@open-wc/testing";
 import { CITATION_CLASSNAME, FOOTNOTE_CLASSNAME } from "./constants";
 
-import { getSelectionInfo } from "./selection_utils";
-import "./lumi_doc";
+import { getSelectionInfo, normalizeSelectionText, looksLikeFragmentedClipboardText } from "./selection_utils";
+import "./elowen_doc";
 
-class MockLumiSpan extends HTMLElement {}
-customElements.define("lumi-span", MockLumiSpan);
+describe("normalizeSelectionText", () => {
+  it("collapses KaTeX token newlines into horizontal math-like text", () => {
+    const raw = [
+      "C",
+      "opacity",
+      "(",
+      "t",
+      ")",
+      "=",
+      "{",
+      "g",
+      "∈",
+      "G",
+      "|",
+      "o",
+      "g",
+      "<",
+      "Q",
+      "τ",
+      "(",
+      "o",
+      ")",
+      "}",
+    ].join("\n");
+    const normalized = normalizeSelectionText(raw);
+    expect(normalized).to.equal("C opacity(t)={g∈G|og<Qτ(o)}");
+    expect(normalized.includes("\n")).to.be.false;
+  });
+
+  it("joins ordinary paragraph newlines with spaces", () => {
+    const normalized = normalizeSelectionText(
+      "First sentence continues here.\nSecond sentence follows."
+    );
+    expect(normalized).to.equal(
+      "First sentence continues here. Second sentence follows."
+    );
+  });
+
+  it("detects fragmented clipboard text from KaTeX tokens", () => {
+    const raw = ["C", "=", "c", "b", "g", "+", "Σ", "i"].join("\n");
+    expect(looksLikeFragmentedClipboardText(raw)).to.equal(true);
+    expect(
+      looksLikeFragmentedClipboardText("line one\nline two is long enough")
+    ).to.equal(false);
+  });
+});
+
+class MockElowenSpan extends HTMLElement {}
+customElements.define("elowen-span", MockElowenSpan);
 
 class ParentWithShadow extends HTMLElement {
   constructor() {
@@ -35,9 +82,9 @@ customElements.define("parent-with-shadow", ParentWithShadow);
 
 /**
  * Test helper to create the DOM structure expected by getSelectionInfo.
- * It mimics the output of `renderLumiSpan` where each character is in its own
+ * It mimics the output of `renderElowenSpan` where each character is in its own
  * span.
- * @param text The text content for the lumi-span.
+ * @param text The text content for the elowen-span.
  * @returns A span element containing character-spans.
  */
 function createCharacterSpans(text: string): HTMLSpanElement {
@@ -53,7 +100,7 @@ function createCharacterSpans(text: string): HTMLSpanElement {
 
 /**
  * Test helper to create the DOM structure with inline elements like citations.
- * @param text The text content for the lumi-span.
+ * @param text The text content for the elowen-span.
  * @param inlinePositions An object where keys are indices to insert an inline
  * element and values are the elements themselves.
  * @returns A span element containing character-spans and inline elements.
@@ -82,16 +129,16 @@ function createCharacterSpansWithInlines(
 }
 
 describe("getSelectionInfo", () => {
-  it("should return selection info for a partial selection within a single lumi-span", async () => {
-    // 1. Create a fixture with our mock <lumi-span> element.
+  it("should return selection info for a partial selection within a single elowen-span", async () => {
+    // 1. Create a fixture with our mock <elowen-span> element.
     const el = await fixture(html` <parent-with-shadow></parent-with-shadow> `);
-    const lumiSpan = document.createElement("lumi-span");
-    lumiSpan.id = "test-span-1";
+    const elowenSpan = document.createElement("elowen-span");
+    elowenSpan.id = "test-span-1";
     const textContent = "This is some test text.";
     const characterSpans = createCharacterSpans(textContent);
-    lumiSpan.appendChild(characterSpans);
+    elowenSpan.appendChild(characterSpans);
 
-    el.shadowRoot!.appendChild(lumiSpan);
+    el.shadowRoot!.appendChild(elowenSpan);
     const charSpans = characterSpans.querySelectorAll("span");
     const startNode = charSpans[5].firstChild!; // "i" in "is"
     const endNode = charSpans[11].firstChild!; // "e" in "some"
@@ -115,8 +162,8 @@ describe("getSelectionInfo", () => {
 
   it("should correctly calculate offset with inline citation and footnote tags", async () => {
     const el = await fixture(html` <parent-with-shadow></parent-with-shadow> `);
-    const lumiSpan = document.createElement("lumi-span");
-    lumiSpan.id = "test-span-inline";
+    const elowenSpan = document.createElement("elowen-span");
+    elowenSpan.id = "test-span-inline";
     const textContent = "Some text.";
 
     // Create mock inline elements
@@ -133,8 +180,8 @@ describe("getSelectionInfo", () => {
       0: citation,
       1: footnote,
     });
-    lumiSpan.appendChild(characterSpans);
-    el.shadowRoot!.appendChild(lumiSpan);
+    elowenSpan.appendChild(characterSpans);
+    el.shadowRoot!.appendChild(elowenSpan);
 
     const startNode = characterSpans.children[7].firstChild!; // 1st "t" in "text"
     const endNode = characterSpans.children[10].firstChild!; // 2nd "t" in "text"
@@ -178,33 +225,33 @@ describe("getSelectionInfo", () => {
     expect(selectionInfo).to.be.null;
   });
 
-  it("should return selection info for a selection spanning multiple lumi-spans", async () => {
+  it("should return selection info for a selection spanning multiple elowen-spans", async () => {
     const el = await fixture(html`<parent-with-shadow></parent-with-shadow>`);
 
-    // LumiSpan 1
-    const lumiSpan1 = document.createElement("lumi-span");
-    lumiSpan1.id = "test-span-1";
+    // ElowenSpan 1
+    const elowenSpan1 = document.createElement("elowen-span");
+    elowenSpan1.id = "test-span-1";
     const text1 = "First part. ";
-    lumiSpan1.appendChild(createCharacterSpans(text1));
+    elowenSpan1.appendChild(createCharacterSpans(text1));
 
-    // LumiSpan 2
-    const lumiSpan2 = document.createElement("lumi-span");
-    lumiSpan2.id = "test-span-2";
+    // ElowenSpan 2
+    const elowenSpan2 = document.createElement("elowen-span");
+    elowenSpan2.id = "test-span-2";
     const text2 = "Second part. ";
-    lumiSpan2.appendChild(createCharacterSpans(text2));
+    elowenSpan2.appendChild(createCharacterSpans(text2));
 
-    // LumiSpan 3
-    const lumiSpan3 = document.createElement("lumi-span");
-    lumiSpan3.id = "test-span-3";
+    // ElowenSpan 3
+    const elowenSpan3 = document.createElement("elowen-span");
+    elowenSpan3.id = "test-span-3";
     const text3 = "Third part.";
-    lumiSpan3.appendChild(createCharacterSpans(text3));
+    elowenSpan3.appendChild(createCharacterSpans(text3));
 
-    el.shadowRoot!.appendChild(lumiSpan1);
-    el.shadowRoot!.appendChild(lumiSpan2);
-    el.shadowRoot!.appendChild(lumiSpan3);
+    el.shadowRoot!.appendChild(elowenSpan1);
+    el.shadowRoot!.appendChild(elowenSpan2);
+    el.shadowRoot!.appendChild(elowenSpan3);
 
-    const charSpans1 = lumiSpan1.querySelectorAll("span > span");
-    const charSpans3 = lumiSpan3.querySelectorAll("span > span");
+    const charSpans1 = elowenSpan1.querySelectorAll("span > span");
+    const charSpans3 = elowenSpan3.querySelectorAll("span > span");
 
     const startNode = charSpans1[6].firstChild!; // "p" in "part. "
     const endNode = charSpans3[4].firstChild!; // "d" in "Third"

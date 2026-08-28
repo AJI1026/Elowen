@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-# Cloud functions for Lumi backend - document preprocessing + import pipeline.
+# Cloud functions for Elowen backend - document preprocessing + import pipeline.
 #
 # This file containing Python cloud functions must be named main.py.
 # See https://cloud.google.com/run/docs/write-functions#python for more info.
@@ -61,7 +61,7 @@ from import_pipeline import (
 )
 import main_testing_utils
 from models import extract_concepts
-from shared.api import LumiAnswerRequest, QueryLog, LumiAnswer, UserFeedback
+from shared.api import ElowenAnswerRequest, QueryLog, ElowenAnswer, UserFeedback
 from shared.constants import (
     ARXIV_ID_MAX_LENGTH,
     MAX_QUERY_LENGTH,
@@ -69,7 +69,7 @@ from shared.constants import (
     MAX_USER_FEEDBACK_LENGTH,
 )
 from shared.json_utils import convert_keys
-from shared.lumi_doc import LumiDoc, LumiSummaries
+from shared.elowen_doc import ElowenDoc, ElowenSummaries
 from shared.types import (
     ArxivMetadata,
     LoadingStatus,
@@ -82,23 +82,23 @@ if os.environ.get("FUNCTION_RUN_MODE") == "testing":
 
     def import_delay(*args, **kwargs):
         time.sleep(2)
-        return main_testing_utils.create_mock_lumidoc(), "image_path"
+        return main_testing_utils.create_mock_elowendoc(), "image_path"
 
     def summary_delay(*args, **kwargs):
         time.sleep(2)
-        return LumiSummaries(
+        return ElowenSummaries(
             section_summaries=[], content_summaries=[], span_summaries=[]
         )
 
     import_pipeline = MagicMock()
     import_pipeline.import_arxiv_latex_and_pdf.side_effect = import_delay
     import_pipeline.import_arxiv_latex_and_pdf.return_value = (
-        main_testing_utils.create_mock_lumidoc()
+        main_testing_utils.create_mock_elowendoc()
     )
 
     summaries = MagicMock()
-    summaries.generate_lumi_summaries.side_effect = summary_delay
-    summaries.generate_lumi_summaries.return_value = LumiSummaries(
+    summaries.generate_elowen_summaries.side_effect = summary_delay
+    summaries.generate_elowen_summaries.return_value = ElowenSummaries(
         section_summaries=[], content_summaries=[], span_summaries=[]
     )
     extract_concepts = MagicMock()
@@ -137,7 +137,7 @@ def _is_locally_emulated() -> bool:
 
 def _copy_fields_to_main_doc(arxiv_id, version_doc, db) -> None:
     """
-    Mirror the updated timestamp and loading_status fields onto the (parent) lumi doc.
+    Mirror the updated timestamp and loading_status fields onto the (parent) elowen doc.
 
     These fields indicate top level the most recently set loading status and updated timestamp
     by any of the child versions, making it possible to query this collection by these
@@ -160,7 +160,7 @@ def _copy_fields_to_main_doc(arxiv_id, version_doc, db) -> None:
 )
 def on_arxiv_versioned_document_written(event: Event[Change[DocumentSnapshot]]) -> None:
     """
-    Depending on loading status, add LumiDoc data and/or write metadata.
+    Depending on loading status, add ElowenDoc data and/or write metadata.
     Triggered by any write to a versioned arXiv document.
     """
     db = firestore.client()
@@ -200,12 +200,12 @@ def on_arxiv_versioned_document_written(event: Event[Change[DocumentSnapshot]]) 
                 data=convert_keys(after_data["metadata"], "camel_to_snake"),
                 config=Config(check_types=False),
             )
-            _save_lumi_metadata(
+            _save_elowen_metadata(
                 arxiv_id, MetadataCollectionItem(metadata=arxiv_metadata)
             )
 
-            # Import source as LumiDoc
-            _add_lumi_doc(versioned_doc_ref, after_data)
+            # Import source as ElowenDoc
+            _add_elowen_doc(versioned_doc_ref, after_data)
         except exceptions.TooManyRequests as e:
             _write_error(
                 versioned_doc_ref,
@@ -230,9 +230,9 @@ def on_arxiv_versioned_document_written(event: Event[Change[DocumentSnapshot]]) 
         finally:
             timer.cancel()
     elif loading_status == LoadingStatus.SUMMARIZING:
-        # Add summaries to existing LumiDoc data
+        # Add summaries to existing ElowenDoc data
         try:
-            _add_summaries_to_lumi_doc(versioned_doc_ref, after_data)
+            _add_summaries_to_elowen_doc(versioned_doc_ref, after_data)
         except exceptions.TooManyRequests as e:
             _write_error(
                 versioned_doc_ref,
@@ -276,15 +276,15 @@ def _write_error(versioned_doc_ref, doc_data, status, error_message):
     doc["loading_status"] = status
     doc["loading_error"] = error_message
     doc["updated_timestamp"] = SERVER_TIMESTAMP
-    lumi_doc_json = convert_keys(doc, "snake_to_camel")
-    versioned_doc_ref.update(lumi_doc_json)
+    elowen_doc_json = convert_keys(doc, "snake_to_camel")
+    versioned_doc_ref.update(elowen_doc_json)
 
     raise https_fn.HttpsError(
         https_fn.FunctionsErrorCode.DEADLINE_EXCEEDED, error_message
     )
 
 
-def _save_lumi_metadata(arxiv_id: str, metadata_item: MetadataCollectionItem):
+def _save_elowen_metadata(arxiv_id: str, metadata_item: MetadataCollectionItem):
     """
     Takes in arxiv_id, version, doc data in dict (TypeScript) form.
     Extracts metadata and saves as new Firestore doc in "arxiv_metadata"
@@ -296,14 +296,14 @@ def _save_lumi_metadata(arxiv_id: str, metadata_item: MetadataCollectionItem):
     doc_ref.set(metadata_item_dict)
 
 
-def _add_lumi_doc(versioned_doc_ref, doc_data):
+def _add_elowen_doc(versioned_doc_ref, doc_data):
     """
     Takes in doc reference, doc data in dict (TypeScript) form.
     Loading status changes from WAITING -> SUMMARIZING.
 
     - Confirms that `loading_status` is `WAITING`.
-    - Imports the PDF and LaTeX source, converting it to a LumiDoc.
-    - Updates the Firestore document with the LumiDoc data and sets `loading_status` to `SUMMARIZING`.
+    - Imports the PDF and LaTeX source, converting it to a ElowenDoc.
+    - Updates the Firestore document with the ElowenDoc data and sets `loading_status` to `SUMMARIZING`.
     """
     metadata_dict = doc_data.get("metadata", {})
     metadata = ArxivMetadata(**convert_keys(metadata_dict, "camel_to_snake"))
@@ -316,20 +316,20 @@ def _add_lumi_doc(versioned_doc_ref, doc_data):
         if test_config.get("importBehavior") == "fail":
             raise Exception("Simulated import failure via testConfig")
 
-    lumi_doc, first_image_path = import_pipeline.import_arxiv_latex_and_pdf(
+    elowen_doc, first_image_path = import_pipeline.import_arxiv_latex_and_pdf(
         arxiv_id=arxiv_id,
         version=version,
         concepts=concepts,
         metadata=metadata,
     )
 
-    lumi_doc.loading_status = LoadingStatus.SUMMARIZING
-    lumi_doc.updated_timestamp = SERVER_TIMESTAMP
-    lumi_doc_json = convert_keys(asdict(lumi_doc), "snake_to_camel")
-    versioned_doc_ref.update(lumi_doc_json)
+    elowen_doc.loading_status = LoadingStatus.SUMMARIZING
+    elowen_doc.updated_timestamp = SERVER_TIMESTAMP
+    elowen_doc_json = convert_keys(asdict(elowen_doc), "snake_to_camel")
+    versioned_doc_ref.update(elowen_doc_json)
 
     # Update the metadata metadata collection doc with the image path
-    _save_lumi_metadata(
+    _save_elowen_metadata(
         arxiv_id,
         MetadataCollectionItem(
             featured_image=FeaturedImage(image_storage_path=first_image_path),
@@ -338,13 +338,13 @@ def _add_lumi_doc(versioned_doc_ref, doc_data):
     )
 
 
-def _add_summaries_to_lumi_doc(versioned_doc_ref, doc_data):
+def _add_summaries_to_elowen_doc(versioned_doc_ref, doc_data):
     """
     Takes in doc reference, doc data in dict (TypeScript) form.
     Loading status changes from SUMMARIZING -> SUCCESS/ERROR.
 
     - Triggered when `loading_status` is `SUMMARIZING`.
-    - Generates summaries for the existing LumiDoc data.
+    - Generates summaries for the existing ElowenDoc data.
     - Updates the document with summaries and sets `loading_status` to `SUCCESS`.
     """
     if os.environ.get("FUNCTION_RUN_MODE") == "testing":
@@ -354,15 +354,15 @@ def _add_summaries_to_lumi_doc(versioned_doc_ref, doc_data):
             raise Exception("Simulated summary failure via testConfig")
 
     doc = from_dict(
-        data_class=LumiDoc,
+        data_class=ElowenDoc,
         data=convert_keys(doc_data, "camel_to_snake"),
         config=Config(check_types=False),
     )
-    doc.summaries = summaries.generate_lumi_summaries(doc)
+    doc.summaries = summaries.generate_elowen_summaries(doc)
     doc.loading_status = LoadingStatus.SUCCESS
     doc.updated_timestamp = SERVER_TIMESTAMP
-    lumi_doc_json = convert_keys(asdict(doc), "snake_to_camel")
-    versioned_doc_ref.update(lumi_doc_json)
+    elowen_doc_json = convert_keys(asdict(doc), "snake_to_camel")
+    versioned_doc_ref.update(elowen_doc_json)
 
 
 @https_fn.on_call(timeout_sec=180, memory=options.MemoryOption.MB_512)
@@ -451,8 +451,8 @@ def _try_doc_write(metadata: ArxivMetadata, test_config: dict | None = None):
         doc = doc_ref.get()
 
         if doc.exists:
-            lumi_doc = doc.to_dict()
-            loading_status = lumi_doc.get("loadingStatus")
+            elowen_doc = doc.to_dict()
+            loading_status = elowen_doc.get("loadingStatus")
 
             if loading_status == LoadingStatus.TIMEOUT:
                 raise https_fn.HttpsError(
@@ -461,8 +461,8 @@ def _try_doc_write(metadata: ArxivMetadata, test_config: dict | None = None):
                 )
             # Allow reload for known recoverable errors, empty "success" docs,
             # and stuck WAITING imports (e.g. emulator restart mid-import).
-            sections = lumi_doc.get("sections") or []
-            abstract = lumi_doc.get("abstract")
+            sections = elowen_doc.get("sections") or []
+            abstract = elowen_doc.get("abstract")
             abstract_contents = (abstract or {}).get("contents") if abstract else None
             # Allow reload when SUCCESS but body sections are missing (DeepSeek
             # imports sometimes only parse the abstract).
@@ -526,13 +526,13 @@ def get_arxiv_metadata(req: https_fn.CallableRequest) -> dict:
     return convert_keys(asdict(metadata_item.metadata), "snake_to_camel")
 
 
-def _log_query(doc: LumiDoc, lumi_answer: LumiAnswer):
+def _log_query(doc: ElowenDoc, elowen_answer: ElowenAnswer):
     """
     Logs a query to the `query_logs` collection in Firestore.
 
     Args:
-        doc (LumiDoc): The document related to the query.
-        lumi_request (LumiAnswerRequest): The user's request.
+        doc (ElowenDoc): The document related to the query.
+        elowen_request (ElowenAnswerRequest): The user's request.
     """
     try:
         db = firestore.client()
@@ -540,7 +540,7 @@ def _log_query(doc: LumiDoc, lumi_answer: LumiAnswer):
         query_log = QueryLog(
             created_timestamp=SERVER_TIMESTAMP,
             expire_timestamp=expire_timestamp,
-            answer=lumi_answer,
+            answer=elowen_answer,
             arxiv_id=doc.metadata.paper_id,
             version=doc.metadata.version,
         )
@@ -557,15 +557,15 @@ def _log_query(doc: LumiDoc, lumi_answer: LumiAnswer):
 
 
 @https_fn.on_call(timeout_sec=120, memory=options.MemoryOption.MB_512)
-def get_lumi_response(req: https_fn.CallableRequest) -> dict:
+def get_elowen_response(req: https_fn.CallableRequest) -> dict:
     """
-    Generates a Lumi answer based on the document and user input.
+    Generates a Elowen answer based on the document and user input.
 
     Args:
         req (https_fn.CallableRequest): The request, containing the doc and request objects.
 
     Returns:
-        A dictionary representation of the LumiAnswer object.
+        A dictionary representation of the ElowenAnswer object.
     """
     doc_dict = req.data.get("doc")
     request_dict = req.data.get("request")
@@ -579,30 +579,30 @@ def get_lumi_response(req: https_fn.CallableRequest) -> dict:
         )
 
     doc = from_dict(
-        data_class=LumiDoc,
+        data_class=ElowenDoc,
         data=convert_keys(doc_dict, "camel_to_snake"),
         config=Config(check_types=False),
     )
-    lumi_request = from_dict(
-        data_class=LumiAnswerRequest,
+    elowen_request = from_dict(
+        data_class=ElowenAnswerRequest,
         data=convert_keys(request_dict, "camel_to_snake"),
         config=Config(check_types=False),
     )
 
-    if lumi_request.query and len(lumi_request.query) > MAX_QUERY_LENGTH:
+    if elowen_request.query and len(elowen_request.query) > MAX_QUERY_LENGTH:
         raise https_fn.HttpsError(
             https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
             "Query exceeds max length.",
         )
-    if lumi_request.highlight and len(lumi_request.highlight) > MAX_HIGHLIGHT_LENGTH:
+    if elowen_request.highlight and len(elowen_request.highlight) > MAX_HIGHLIGHT_LENGTH:
         raise https_fn.HttpsError(
             https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
             "Highlight exceeds max length.",
         )
 
     try:
-        lumi_answer = answers.generate_lumi_answer(
-            doc, lumi_request, api_key, model_config
+        elowen_answer = answers.generate_elowen_answer(
+            doc, elowen_request, api_key, model_config
         )
     except exceptions.TooManyRequests as e:
         raise https_fn.HttpsError(
@@ -616,9 +616,9 @@ def get_lumi_response(req: https_fn.CallableRequest) -> dict:
         )
 
     if not _is_locally_emulated():
-        _log_query(doc, lumi_answer)
+        _log_query(doc, elowen_answer)
 
-    return convert_keys(asdict(lumi_answer), "snake_to_camel")
+    return convert_keys(asdict(elowen_answer), "snake_to_camel")
 
 
 @https_fn.on_call(timeout_sec=120, memory=options.MemoryOption.MB_512)
@@ -644,7 +644,7 @@ def get_personal_summary(req: https_fn.CallableRequest) -> dict:
         )
 
     doc = from_dict(
-        data_class=LumiDoc,
+        data_class=ElowenDoc,
         data=convert_keys(doc_dict, "camel_to_snake"),
         config=Config(check_types=False),
     )

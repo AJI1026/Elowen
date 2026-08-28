@@ -21,13 +21,15 @@ import "../../settings/reading_history";
 
 import { MobxLitElement } from "@adobe/lit-mobx";
 import { CSSResultGroup, html } from "lit";
-import { customElement, query } from "lit/decorators.js";
+import { customElement } from "lit/decorators.js";
 
 import { core } from "../../../core/core";
 import {
   DialogService,
   HistoryDialogProps,
 } from "../../../services/dialog.service";
+import { SettingsService } from "../../../services/settings.service";
+import { t } from "../../../shared/i18n";
 import { styles } from "./history_dialog.scss";
 
 /**
@@ -38,6 +40,11 @@ export class HistoryDialog extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
   private readonly dialogService = core.getService(DialogService);
+  private readonly settingsService = core.getService(SettingsService);
+
+  private uiLang() {
+    return this.settingsService.responseLanguage.value;
+  }
 
   private handleClose() {
     if (this.dialogService) {
@@ -50,17 +57,17 @@ export class HistoryDialog extends MobxLitElement {
   }
 
   override render() {
+    const lang = this.uiLang();
     return html`
       <pr-dialog
         .onClose=${this.handleClose.bind(this)}
         .showDialog=${this.shouldShowDialog()}
         showCloseButton
       >
-        <div slot="title">Reading History</div>
+        <div slot="title">${t("history.dialogTitle", lang)}</div>
         <div>
           <p class="dialog-explanation">
-            The following papers are included as context for the model when
-            generating personalized paper-level summaries:
+            ${t("history.dialogExplanation", lang)}
           </p>
           <reading-history></reading-history>
         </div>

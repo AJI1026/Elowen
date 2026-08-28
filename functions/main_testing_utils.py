@@ -15,17 +15,17 @@
 
 
 from typing import List
-from shared.lumi_doc import (
-    LumiDoc,
+from shared.elowen_doc import (
+    ElowenDoc,
 )
 from shared.types_local_storage import PaperData
-from shared.api import LumiAnswer, LumiAnswerRequest
+from shared.api import ElowenAnswer, ElowenAnswerRequest
 from shared.types import ArxivMetadata
 
 
-def create_mock_lumidoc() -> LumiDoc:
-    """Creates a mock LumiDoc object for testing."""
-    return LumiDoc(
+def create_mock_elowendoc() -> ElowenDoc:
+    """Creates a mock ElowenDoc object for testing."""
+    return ElowenDoc(
         markdown="Test markdown",
         sections=[],
         concepts=[],
@@ -59,9 +59,9 @@ def create_mock_paper_data() -> List[PaperData]:
         PaperData(
             metadata=create_mock_arxiv_metadata(),
             history=[
-                LumiAnswer(
+                ElowenAnswer(
                     id="ans1",
-                    request=LumiAnswerRequest(query="What is this?"),
+                    request=ElowenAnswerRequest(query="What is this?"),
                     response_content=[],
                     timestamp=1234567890,
                 )

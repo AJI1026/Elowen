@@ -20,8 +20,9 @@ import { CSSResultGroup, html, nothing } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { computed, makeObservable } from "mobx";
-import "../lumi_concept/lumi_concept";
-import "../lumi_questions/lumi_questions";
+import "../elowen_concept/elowen_concept";
+import "../elowen_questions/elowen_questions";
+import "../elowen_annotations/elowen_annotations";
 import "../tab_component/tab_component";
 import "../table_of_contents/table_of_contents";
 import "./sidebar_header";
@@ -36,24 +37,29 @@ import {
   AnalyticsService,
 } from "../../services/analytics.service";
 import { SIDEBAR_TABS } from "../../shared/constants";
+import { sidebarTabLabel } from "../../shared/i18n";
+import { SettingsService } from "../../services/settings.service";
 import {
   AnswerHighlightTooltipProps,
   FloatingPanelService,
+  UserAnnotationTooltipProps,
 } from "../../services/floating_panel_service";
 import { LightMobxLitElement } from "../light_mobx_lit_element/light_mobx_lit_element";
 import { HistoryService } from "../../services/history.service";
-import { LumiAnswer } from "../../shared/api";
+import { ElowenAnswer } from "../../shared/api";
+import { UserAnnotation } from "../../shared/types_local_storage";
 import { createRef, Ref, ref } from "lit/directives/ref.js";
 
 /**
  * A sidebar component that displays a list of concepts.
  */
-@customElement("lumi-sidebar")
-export class LumiSidebar extends LightMobxLitElement {
+@customElement("elowen-sidebar")
+export class ElowenSidebar extends LightMobxLitElement {
   private readonly documentStateService = core.getService(DocumentStateService);
   private readonly floatingPanelService = core.getService(FloatingPanelService);
   private readonly analyticsService = core.getService(AnalyticsService);
   private readonly historyService = core.getService(HistoryService);
+  private readonly settingsService = core.getService(SettingsService);
   private readonly collapseManager = this.documentStateService.collapseManager;
 
   @query(".tabs-container")
@@ -95,42 +101,82 @@ export class LumiSidebar extends LightMobxLitElement {
       }
     };
     const selectedTab = this.collapseManager?.sidebarTabSelection;
+    const lang = this.settingsService.responseLanguage.value;
 
     return html`
-      <sidebar-header>
-        <div class="tabs-header">
+      <div class="sidebar-top">
+        <sidebar-header></sidebar-header>
+        <div class="tabs-header" role="tablist">
           ${Object.values(SIDEBAR_TABS).map(
             (tab) => html`
               <button
                 class="tab-button ${selectedTab === tab ? "selected" : ""}"
+                role="tab"
+                aria-selected=${selectedTab === tab ? "true" : "false"}
                 @click=${() => handleTabClick(tab)}
               >
-                ${tab}
+                ${sidebarTabLabel(tab, lang)}
               </button>
             `
           )}
         </div>
-      </sidebar-header>
+      </div>
     `;
   }
 
   private renderQuestions() {
     const classes = {
-      "lumi-questions-container": true,
+      "elowen-questions-container": true,
     };
 
     return html`
       <div class=${classMap(classes)} slot=${SIDEBAR_TABS.ANSWERS}>
-        <lumi-questions></lumi-questions>
+        <elowen-questions></elowen-questions>
+      </div>
+    `;
+  }
+
+  private getDocId(): string | undefined {
+    return this.documentStateService.elowenDocManager?.elowenDoc.metadata?.paperId;
+  }
+
+  private renderAnnotations() {
+    const docId = this.getDocId();
+    if (!docId) return nothing;
+
+    return html`
+      <div class="annotations-container" slot=${SIDEBAR_TABS.ANNOTATIONS}>
+        <elowen-annotations .docId=${docId}></elowen-annotations>
       </div>
     `;
   }
 
   private readonly handleAnswerHighlightClick = (
-    answer: LumiAnswer,
+    answer: ElowenAnswer,
     target: HTMLElement
   ) => {
     const props = new AnswerHighlightTooltipProps(answer);
+    this.floatingPanelService.show(props, target);
+  };
+
+  private readonly handleUserAnnotationClick = (
+    annotation: UserAnnotation,
+    target: HTMLElement
+  ) => {
+    const docId = this.getDocId();
+    if (!docId) return;
+
+    const props = new UserAnnotationTooltipProps(
+      annotation,
+      docId,
+      (updated) => this.historyService.updateAnnotation(docId, updated),
+      (annotationId) =>
+        this.historyService.removeAnnotation(docId, annotationId),
+      (item) =>
+        this.documentStateService.focusOnSpan(item.highlightedSpans, {
+          color: item.color,
+        })
+    );
     this.floatingPanelService.show(props, target);
   };
 
@@ -138,22 +184,26 @@ export class LumiSidebar extends LightMobxLitElement {
     if (!this.collapseManager) return nothing;
 
     const concepts =
-      this.documentStateService.lumiDocManager?.lumiDoc.concepts || [];
+      this.documentStateService.elowenDocManager?.elowenDoc.concepts || [];
 
     return html`
       <div class="concepts-container" slot=${SIDEBAR_TABS.CONCEPTS}>
         <div class="concepts-list">
           ${concepts.map(
             (concept) =>
-              html`<lumi-concept
+              html`<elowen-concept
                 .concept=${concept}
                 .highlightManager=${this.documentStateService.highlightManager}
                 .answerHighlightManager=${this.historyService
                   .answerHighlightManager}
+                .userHighlightManager=${this.historyService.userHighlightManager}
                 .onAnswerHighlightClick=${this.handleAnswerHighlightClick.bind(
                   this
                 )}
-              ></lumi-concept>`
+                .onUserAnnotationClick=${this.handleUserAnnotationClick.bind(
+                  this
+                )}
+              ></elowen-concept>`
           )}
         </div>
       </div>
@@ -164,9 +214,9 @@ export class LumiSidebar extends LightMobxLitElement {
     return html`
       <div class="toc-container" slot=${SIDEBAR_TABS.TOC}>
         <table-of-contents
-          .sections=${this.documentStateService.lumiDocManager?.lumiDoc
+          .sections=${this.documentStateService.elowenDocManager?.elowenDoc
             .sections}
-          .lumiSummariesMap=${this.documentStateService.lumiDocManager
+          .elowenSummariesMap=${this.documentStateService.elowenDocManager
             ?.summaryMaps}
           .onSectionClicked=${(sectionId: string) => {
             this.analyticsService.trackAction(
@@ -195,7 +245,8 @@ export class LumiSidebar extends LightMobxLitElement {
             .tabs=${Object.values(SIDEBAR_TABS)}
             .selectedTab=${this.collapseManager?.sidebarTabSelection}
           >
-            ${this.renderQuestions()} ${this.renderConcepts()}
+            ${this.renderQuestions()} ${this.renderAnnotations()}
+            ${this.renderConcepts()}
             ${this.renderToc()}
           </tab-component>
         </div>
@@ -233,6 +284,6 @@ export class LumiSidebar extends LightMobxLitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "lumi-sidebar": LumiSidebar;
+    "elowen-sidebar": ElowenSidebar;
   }
 }

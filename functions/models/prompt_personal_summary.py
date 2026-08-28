@@ -15,7 +15,7 @@
 
 from typing import List
 from shared import import_tags
-from shared.lumi_doc import LumiDoc
+from shared.elowen_doc import ElowenDoc
 from shared import prompt_utils
 from shared.types_local_storage import PaperData
 
@@ -55,7 +55,7 @@ Here are the sentences from the document:
 """
 
 
-def make_personal_summary_prompt(doc: LumiDoc, past_papers: List[PaperData]):
+def make_personal_summary_prompt(doc: ElowenDoc, past_papers: List[PaperData]):
     all_spans = prompt_utils.get_all_spans_from_doc(doc)
     formatted_spans = prompt_utils.get_formatted_spans_list(all_spans)
     spans_string = "\n".join(formatted_spans)

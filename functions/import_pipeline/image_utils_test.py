@@ -23,7 +23,7 @@ from PIL import Image as PIL_Image
 
 from import_pipeline import image_utils
 from shared.types import ImageMetadata
-from shared.lumi_doc import ImageContent
+from shared.elowen_doc import ImageContent
 
 class ImageUtilsTest(unittest.TestCase):
 

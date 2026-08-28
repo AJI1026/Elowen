@@ -19,14 +19,14 @@ import re
 from typing import Dict, Optional
 
 
-from import_pipeline.convert_lumi_spans import (
+from import_pipeline.convert_elowen_spans import (
     parse_text_and_extract_inner_tags,
-    create_lumi_spans,
+    create_elowen_spans,
 )
 from import_pipeline.import_utils import unescape
 from import_pipeline.markdown_utils import substitute_equation_placeholders
-from shared.lumi_doc import (
-    LumiContent,
+from shared.elowen_doc import (
+    ElowenContent,
     ListContent,
     ListItem,
 )
@@ -43,11 +43,11 @@ DEFAULT_LIST_TAGS = [ORDERED_LIST_TAG, UNORDERED_LIST_TAG]
 
 def get_list_content_from_tag(
     tag: bs4.Tag,
-    placeholder_map: Dict[str, LumiContent],
+    placeholder_map: Dict[str, ElowenContent],
     strip_double_brackets=False,
-) -> Optional[LumiContent]:
+) -> Optional[ElowenContent]:
     """
-    Returns a LumiContent object for list tags (ul, ol).
+    Returns a ElowenContent object for list tags (ul, ol).
     Note: This function does not currently handle images embedded within list items.
     """
 
@@ -63,11 +63,13 @@ def get_list_content_from_tag(
                 # If the child node is a list, process it as a nested sublist.
                 # (There can only be one nested sublist per list item.)
                 if child_node.name in DEFAULT_LIST_TAGS and subListContent is None:
-                    nested_lumi_content_obj = get_list_content_from_tag(
-                        child_node, placeholder_map
+                    nested_elowen_content_obj = get_list_content_from_tag(
+                        child_node,
+                        placeholder_map,
+                        strip_double_brackets=strip_double_brackets,
                     )
-                    if nested_lumi_content_obj and nested_lumi_content_obj.list_content:
-                        subListContent = nested_lumi_content_obj.list_content
+                    if nested_elowen_content_obj and nested_elowen_content_obj.list_content:
+                        subListContent = nested_elowen_content_obj.list_content
                 # If the child node is a <p> tag, process its contents instead of the tag itself.
                 elif isinstance(child_node, bs4.Tag) and child_node.name == "p":
                     for p_child in child_node.contents:
@@ -87,9 +89,9 @@ def get_list_content_from_tag(
 
             current_li_spans = []
             if cleaned_li_text.strip() or li_inner_tags:
-                # Create the new LumiSpans from the processed text (with tags removed etc)
+                # Create the new ElowenSpans from the processed text (with tags removed etc)
                 # and parsed inner tags.
-                current_li_spans = create_lumi_spans(
+                current_li_spans = create_elowen_spans(
                     cleaned_li_text,
                     li_inner_tags,
                     strip_double_brackets=strip_double_brackets,
@@ -99,7 +101,7 @@ def get_list_content_from_tag(
                 ListItem(spans=current_li_spans, subListContent=subListContent)
             )
 
-        return LumiContent(
+        return ElowenContent(
             id=get_unique_id(),
             list_content=ListContent(
                 is_ordered=(tag.name == ORDERED_LIST_TAG),

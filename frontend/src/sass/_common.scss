@@ -48,7 +48,7 @@ pr-circular-progress {
   opacity: 0.5;
 }
 
-.c-lumi-info-icon {
+.c-elowen-info-icon {
   cursor: pointer;
   --pr-icon-font-size: 16px;
 }
@@ -347,8 +347,8 @@ pr-circular-progress {
   }
 }
 
-// LumiDoc Content Grid
-@mixin lumi-doc-grid {
+// ElowenDoc Content Grid
+@mixin elowen-doc-grid {
   display: grid;
   grid-template-columns: 0.2fr 2fr 0.2fr;
 
@@ -358,17 +358,17 @@ pr-circular-progress {
 }
 
 // Fonts
-@mixin lumi-paper-text-font {
+@mixin elowen-paper-text-font {
   font-family: "Lora", "Georgia", "Serif";
 }
 
-@mixin lumi-paper-text {
+@mixin elowen-paper-text {
   @include typescale.body-medium;
-  @include lumi-paper-text-font;
+  @include elowen-paper-text-font;
 
   @include viewport-small {
     @include typescale.body-medium;
-    @include lumi-paper-text-font;
+    @include elowen-paper-text-font;
   }
 }
 

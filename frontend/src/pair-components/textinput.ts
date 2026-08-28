@@ -25,6 +25,10 @@ import { getComponentClassName } from "./utils";
 
 import { styles } from "./textinput.scss";
 import { ifDefined } from "lit/directives/if-defined.js";
+import {
+  looksLikeFragmentedClipboardText,
+  normalizeSelectionText,
+} from "../shared/selection_utils";
 
 /**
  * Text input
@@ -50,6 +54,28 @@ export class TextInput extends LitElement {
     ...LitElement.shadowRootOptions,
     delegatesFocus: true,
   };
+
+  private onPaste(e: ClipboardEvent) {
+    const raw = e.clipboardData?.getData("text/plain") ?? "";
+    if (!looksLikeFragmentedClipboardText(raw)) {
+      return;
+    }
+    e.preventDefault();
+    const normalized = normalizeSelectionText(raw);
+    const input = e.target as HTMLInputElement;
+    const start = input.selectionStart ?? this.value.length;
+    const end = input.selectionEnd ?? this.value.length;
+    let next = this.value.slice(0, start) + normalized + this.value.slice(end);
+    if (this.maxLength) {
+      next = next.slice(0, this.maxLength);
+    }
+    this.value = next;
+    input.value = next;
+    const synthetic = {
+      target: input,
+    } as unknown as InputEvent;
+    this.onChange(synthetic);
+  }
 
   renderLabel() {
     const sizeClass = getComponentClassName("label-size", this.size);
@@ -80,6 +106,7 @@ export class TextInput extends LitElement {
         .maxLength=${ifDefined(this.maxLength)}
         @keydown=${this.onKeydown}
         @input=${this.onChange}
+        @paste=${this.onPaste}
       />`;
   }
 }

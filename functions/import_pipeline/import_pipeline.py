@@ -20,22 +20,22 @@ from import_pipeline import fetch_utils
 from import_pipeline import markdown_utils
 from import_pipeline import image_utils
 from import_pipeline import latex_utils
-from import_pipeline import convert_html_to_lumi
+from import_pipeline import convert_html_to_elowen
 from models import gemini
 from models import extract_concepts as extract_concepts_util
 from shared import import_tags
-from shared.lumi_doc import (
-    LumiReference,
-    LumiAbstract,
-    LumiConcept,
-    LumiDoc,
-    LumiSection,
-    LumiContent,
-    LumiSpan,
+from shared.elowen_doc import (
+    ElowenReference,
+    ElowenAbstract,
+    ElowenConcept,
+    ElowenDoc,
+    ElowenSection,
+    ElowenContent,
+    ElowenSpan,
     ImageContent,
     HtmlFigureContent,
     FigureContent,
-    LumiFootnote,
+    ElowenFootnote,
 )
 from shared.types import ArxivMetadata
 from shared.constants import (
@@ -56,26 +56,26 @@ STORAGE_PATH_DELIMETER = "__"
 def import_arxiv_latex_and_pdf(
     arxiv_id: str,
     version: str,
-    concepts: List[LumiConcept],
+    concepts: List[ElowenConcept],
     metadata: ArxivMetadata,
     debug=False,
     existing_model_output_file="",
     run_locally: bool = False,
-) -> Tuple[LumiDoc, str]:
+) -> Tuple[ElowenDoc, str]:
     """
     Imports and processes the pdf and latex source with the given identifiers.
 
     Args:
         arxiv_id (str): The paper id.
         version (int): The paper version.
-        concepts (List[LumiConcept]): A list of concepts to identify in the text.
+        concepts (List[ElowenConcept]): A list of concepts to identify in the text.
         metadata (ArxivMetadata): The metadata associated with the arxiv paper.
         debug (boolean): If true, writes debug output markdown to local file.
         existing_model_output_file (str): If passed, used in place of generating new model output.
         run_locally (bool): If true, saves files locally instead of cloud.
 
     Returns:
-        Tuple[LumiDoc, str]: The processed document and the first image storage path in the document.
+        Tuple[ElowenDoc, str]: The processed document and the first image storage path in the document.
     """
     # Fetch PDF bytes
     if not existing_model_output_file:
@@ -120,15 +120,15 @@ def import_arxiv_latex_and_pdf(
             with open(model_output_path, "w+") as file:
                 file.write(model_output)
 
-        lumi_doc = convert_model_output_to_lumi_doc(
+        elowen_doc = convert_model_output_to_elowen_doc(
             model_output_string=model_output,
             concepts=concepts,
             file_id=arxiv_id,
         )
-        lumi_doc.metadata = metadata
+        elowen_doc.metadata = metadata
 
-        # Extract images from LaTeX source using info from the parsed LumiDoc
-        all_image_contents = _collect_image_contents(lumi_doc)
+        # Extract images from LaTeX source using info from the parsed ElowenDoc
+        all_image_contents = _collect_image_contents(elowen_doc)
         # This call updates the width/height on the image contents and writes
         # the images referenced in image contents to the cloud bucket.
         images = image_utils.extract_images_from_latex_source(
@@ -141,21 +141,21 @@ def import_arxiv_latex_and_pdf(
         if len(images) > 0:
             image_path = images[0].storage_path
 
-    return lumi_doc, image_path
+    return elowen_doc, image_path
 
 
-def _collect_image_contents(doc: LumiDoc) -> List[ImageContent]:
-    """Recursively finds and collects all ImageContent objects in a LumiDoc."""
+def _collect_image_contents(doc: ElowenDoc) -> List[ImageContent]:
+    """Recursively finds and collects all ImageContent objects in a ElowenDoc."""
     image_contents = []
 
-    def collect_from_contents(contents: List[LumiContent]):
+    def collect_from_contents(contents: List[ElowenContent]):
         for content in contents:
             if content.image_content:
                 image_contents.append(content.image_content)
             if content.figure_content:
                 image_contents.extend(content.figure_content.images)
 
-    def collect_from_sections(sections: List[LumiSection]):
+    def collect_from_sections(sections: List[ElowenSection]):
         for section in sections:
             collect_from_contents(section.contents)
             if section.sub_sections:
@@ -168,19 +168,19 @@ def _collect_image_contents(doc: LumiDoc) -> List[ImageContent]:
     return image_contents
 
 
-def convert_model_output_to_lumi_doc(
-    model_output_string: str, concepts: List[LumiConcept], file_id: str
-) -> LumiDoc:
-    """Converts the model output string to a LumiDoc."""
+def convert_model_output_to_elowen_doc(
+    model_output_string: str, concepts: List[ElowenConcept], file_id: str
+) -> ElowenDoc:
+    """Converts the model output string to a ElowenDoc."""
     # --- Pre-process for figures (tables, algorithms, images) ---
-    placeholder_map: Dict[str, LumiContent] = {}
+    placeholder_map: Dict[str, ElowenContent] = {}
     processed_markdown = preprocess_and_replace_figures(
         model_output_string, file_id, placeholder_map
     )
 
-    parsed_data = markdown_utils.parse_lumi_import(processed_markdown)
+    parsed_data = markdown_utils.parse_elowen_import(processed_markdown)
 
-    lumi_abstract = None
+    elowen_abstract = None
     if parsed_data.get("abstract"):
         # Extract equations before markdown conversion
         abstract_markdown, equation_map = (
@@ -191,7 +191,7 @@ def convert_model_output_to_lumi_doc(
         abstract_html = markdown_utils.markdown_to_html(abstract_markdown)
         combined_placeholder_map = {**placeholder_map, **equation_map}
 
-        abstract_sections = convert_html_to_lumi.convert_to_lumi_sections(
+        abstract_sections = convert_html_to_elowen.convert_to_elowen_sections(
             abstract_html, placeholder_map=combined_placeholder_map
         )
         if len(abstract_sections) > 1:
@@ -205,13 +205,13 @@ def convert_model_output_to_lumi_doc(
                     extract_concepts_util.annotate_concepts_in_place(
                         content.text_content.spans, concepts
                     )
-            lumi_abstract = LumiAbstract(contents=abstract_section.contents)
+            elowen_abstract = ElowenAbstract(contents=abstract_section.contents)
 
-    if lumi_abstract is None:
+    if elowen_abstract is None:
         # Ensure callers/UI always receive a valid abstract object.
-        lumi_abstract = LumiAbstract(contents=[])
+        elowen_abstract = ElowenAbstract(contents=[])
 
-    lumi_sections = []
+    elowen_sections = []
     if parsed_data.get("content"):
         # Extract equations before markdown conversion
         content_markdown, equation_map = (
@@ -220,55 +220,55 @@ def convert_model_output_to_lumi_doc(
         content_html = markdown_utils.markdown_to_html(content_markdown)
         combined_placeholder_map = {**placeholder_map, **equation_map}
 
-        lumi_sections = convert_html_to_lumi.convert_to_lumi_sections(
+        elowen_sections = convert_html_to_elowen.convert_to_elowen_sections(
             content_html, placeholder_map=combined_placeholder_map
         )
 
-    lumi_references = []
+    elowen_references = []
     if parsed_data.get("references"):
         for item in parsed_data.get("references"):
             # Parse the reference content for inner tags.
             # Note: References are not split into multiple sentences/spans.
             # The entire reference content is treated as a single span.
-            spans = convert_html_to_lumi.convert_raw_output_to_spans(
+            spans = convert_html_to_elowen.convert_raw_output_to_spans(
                 item["content"], skip_tokenize=True
             )
             if spans:
-                lumi_references.append(
-                    LumiReference(
+                elowen_references.append(
+                    ElowenReference(
                         id=item["id"],
                         span=spans[0],
                     )
                 )
 
-    lumi_footnotes = []
+    elowen_footnotes = []
     if parsed_data.get("footnotes"):
         for item in parsed_data.get("footnotes"):
-            spans = convert_html_to_lumi.convert_raw_output_to_spans(
+            spans = convert_html_to_elowen.convert_raw_output_to_spans(
                 item["content"], skip_tokenize=True
             )
             if spans:
-                lumi_footnotes.append(
-                    LumiFootnote(
+                elowen_footnotes.append(
+                    ElowenFootnote(
                         id=item["id"],
                         span=spans[0],
                     )
                 )
 
-    _ensure_parsed_document_has_content(lumi_abstract, lumi_sections)
+    _ensure_parsed_document_has_content(elowen_abstract, elowen_sections)
 
-    return LumiDoc(
+    return ElowenDoc(
         markdown="",
-        abstract=lumi_abstract,
-        sections=lumi_sections,
-        references=lumi_references,
-        footnotes=lumi_footnotes,
+        abstract=elowen_abstract,
+        sections=elowen_sections,
+        references=elowen_references,
+        footnotes=elowen_footnotes,
         concepts=concepts,
     )
 
 
 def _ensure_parsed_document_has_content(
-    abstract: LumiAbstract | None, sections: list
+    abstract: ElowenAbstract | None, sections: list
 ) -> None:
     has_abstract = bool(abstract and abstract.contents)
     has_sections = bool(sections)
@@ -280,18 +280,18 @@ def _ensure_parsed_document_has_content(
 
 
 def preprocess_and_replace_figures(
-    raw_markdown_string: str, file_id: str, placeholder_map: Dict[str, LumiContent]
+    raw_markdown_string: str, file_id: str, placeholder_map: Dict[str, ElowenContent]
 ) -> str:
     """Finds all figure blocks, replaces them with placeholders, and stores them in a map."""
 
     def _get_placeholder_id(uid: str):
         return f"{PLACEHOLDER_PREFIX}{uid}{PLACEHOLDER_SUFFIX}"
 
-    def _create_caption_span(caption_text: str) -> Optional[LumiSpan]:
-        """Helper to create a LumiSpan for a caption."""
+    def _create_caption_span(caption_text: str) -> Optional[ElowenSpan]:
+        """Helper to create a ElowenSpan for a caption."""
         if not caption_text:
             return None
-        caption_spans = convert_html_to_lumi.convert_raw_output_to_spans(
+        caption_spans = convert_html_to_elowen.convert_raw_output_to_spans(
             caption_text, skip_tokenize=True
         )
         return caption_spans[0] if caption_spans else None
@@ -317,7 +317,7 @@ def preprocess_and_replace_figures(
         image_path = match.group("image_path")
         caption_text = (match.group("image_caption_text") or "").strip()
 
-        placeholder_map[placeholder_id] = LumiContent(
+        placeholder_map[placeholder_id] = ElowenContent(
             id=id, image_content=_create_image_content(image_path, caption_text)
         )
         return placeholder_id
@@ -340,7 +340,7 @@ def preprocess_and_replace_figures(
             caption_text = (img_match.group("image_caption_text") or "").strip()
             sub_images.append(_create_image_content(image_path, caption_text))
 
-        placeholder_map[placeholder_id] = LumiContent(
+        placeholder_map[placeholder_id] = ElowenContent(
             id=id,
             figure_content=FigureContent(images=sub_images, caption=main_caption_span),
         )
@@ -353,7 +353,7 @@ def preprocess_and_replace_figures(
         caption_text = (match.group("html_caption_text") or "").strip()
         caption_span = _create_caption_span(caption_text)
 
-        placeholder_map[placeholder_id] = LumiContent(
+        placeholder_map[placeholder_id] = ElowenContent(
             id=id,
             html_figure_content=HtmlFigureContent(
                 html=markdown_utils.postprocess_content_text(html_content.strip()),

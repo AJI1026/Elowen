@@ -17,18 +17,19 @@
 
 import { action, computed, makeObservable, observable } from "mobx";
 import { Service } from "./service";
-import { LumiAnswer } from "../shared/api";
-import { PaperData } from "../shared/types_local_storage";
+import { ElowenAnswer } from "../shared/api";
+import { PaperData, UserAnnotation } from "../shared/types_local_storage";
 import { LocalStorageService } from "./local_storage.service";
-import { ArxivMetadata } from "../shared/lumi_doc";
-import { sortPaperDataByTimestamp } from "../shared/lumi_paper_utils";
+import { ArxivMetadata } from "../shared/elowen_doc";
+import { sortPaperDataByTimestamp } from "../shared/elowen_paper_utils";
 import { PERSONAL_SUMMARY_QUERY_NAME } from "../shared/constants";
 import { AnswerHighlightManager } from "../shared/answer_highlight_manager";
+import { UserHighlightManager } from "../shared/user_highlight_manager";
 import { HistoryCollapseManager } from "../shared/history_collapse_manager";
 import { ScrollState } from "../contexts/scroll_context";
-import { getAllSpansFromContents } from "../shared/lumi_doc_utils";
+import { getAllSpansFromContents } from "../shared/elowen_doc_utils";
 
-const PAPER_KEY_PREFIX = "lumi-paper:";
+const PAPER_KEY_PREFIX = "elowen-paper:";
 const INITIAL_SUMMARY_COLLAPSE_STATE = true;
 
 interface ServiceProvider {
@@ -36,15 +37,17 @@ interface ServiceProvider {
 }
 
 /**
- * A service to manage the history of Lumi questions and answers.
+ * A service to manage the history of Elowen questions and answers.
  * History is stored per document ID in local storage.
  */
 export class HistoryService extends Service {
-  answers = new Map<string, LumiAnswer[]>();
-  temporaryAnswers: LumiAnswer[] = [];
+  answers = new Map<string, ElowenAnswer[]>();
+  temporaryAnswers: ElowenAnswer[] = [];
   paperMetadata = new Map<string, ArxivMetadata>();
-  personalSummaries = new Map<string, LumiAnswer>();
+  personalSummaries = new Map<string, ElowenAnswer>();
+  annotations = new Map<string, UserAnnotation[]>();
   readonly answerHighlightManager: AnswerHighlightManager;
+  readonly userHighlightManager: UserHighlightManager;
   readonly historyCollapseManager: HistoryCollapseManager;
 
   private scrollState?: ScrollState;
@@ -53,19 +56,25 @@ export class HistoryService extends Service {
   constructor(private readonly sp: ServiceProvider) {
     super();
     this.answerHighlightManager = new AnswerHighlightManager();
+    this.userHighlightManager = new UserHighlightManager();
     this.historyCollapseManager = new HistoryCollapseManager();
     makeObservable(this, {
       answers: observable.shallow,
       temporaryAnswers: observable.shallow,
       paperMetadata: observable.shallow,
       personalSummaries: observable.shallow,
+      annotations: observable.shallow,
       isAnswerLoading: computed,
       addAnswer: action,
+      removeAnswer: action,
       addTemporaryAnswer: action,
       removeTemporaryAnswer: action,
       clearTemporaryAnswers: action,
       addPaper: action,
       addPersonalSummary: action,
+      addAnnotation: action,
+      updateAnnotation: action,
+      removeAnnotation: action,
       addLoadingPaper: action,
       deletePaper: action,
       clearAllHistory: action,
@@ -94,7 +103,8 @@ export class HistoryService extends Service {
   override initialize(): void {
     // Load all paper data from local storage on initialization
     const paperKeys = this.sp.localStorageService.listKeys(PAPER_KEY_PREFIX);
-    const allAnswers: LumiAnswer[] = [];
+    const allAnswers: ElowenAnswer[] = [];
+    const allAnnotations: UserAnnotation[] = [];
     for (const key of paperKeys) {
       const paperData = this.sp.localStorageService.getData<PaperData | null>(
         key,
@@ -112,9 +122,14 @@ export class HistoryService extends Service {
             INITIAL_SUMMARY_COLLAPSE_STATE
           );
         }
+        if (paperData.annotations) {
+          this.annotations.set(paperId, paperData.annotations);
+          allAnnotations.push(...paperData.annotations);
+        }
       }
     }
     this.answerHighlightManager.populateFromAnswers(allAnswers);
+    this.userHighlightManager.populateFromAnnotations(allAnnotations);
     this.historyCollapseManager.initialize(allAnswers);
 
     for (const answer of allAnswers) {
@@ -125,10 +140,14 @@ export class HistoryService extends Service {
   /**
    * Retrieves the answer history for a given document ID.
    * @param docId The ID of the document.
-   * @returns An array of LumiAnswer objects, or an empty array if none exist.
+   * @returns An array of ElowenAnswer objects, or an empty array if none exist.
    */
-  getAnswers(docId: string): LumiAnswer[] {
+  getAnswers(docId: string): ElowenAnswer[] {
     return this.answers.get(docId) || [];
+  }
+
+  getAnnotations(docId: string): UserAnnotation[] {
+    return this.annotations.get(docId) || [];
   }
 
   getPaperData(docId: string): PaperData | null {
@@ -158,21 +177,28 @@ export class HistoryService extends Service {
     return papers;
   }
 
-  private updateAnswerSpansMap(answer: LumiAnswer) {
+  private updateAnswerSpansMap(answer: ElowenAnswer) {
     const spans = getAllSpansFromContents(answer.responseContent);
     for (const span of spans) {
       this.spanIdToAnswerIdMap.set(span.id, answer.id);
     }
+  }
 
+  private removeAnswerSpansMap(answerId: string) {
+    for (const [spanId, mappedAnswerId] of this.spanIdToAnswerIdMap.entries()) {
+      if (mappedAnswerId === answerId) {
+        this.spanIdToAnswerIdMap.delete(spanId);
+      }
+    }
   }
 
   /**
    * Adds a new answer to the history for a given document ID.
    * Answers are prepended to the array to keep the most recent first.
    * @param docId The ID of the document.
-   * @param answer The LumiAnswer object to add.
+   * @param answer The ElowenAnswer object to add.
    */
-  addAnswer(docId: string, answer: LumiAnswer) {
+  addAnswer(docId: string, answer: ElowenAnswer) {
     const currentAnswers = this.getAnswers(docId);
     this.answers.set(docId, [answer, ...currentAnswers]);
     this.answerHighlightManager.addAnswer(answer);
@@ -183,12 +209,32 @@ export class HistoryService extends Service {
   }
 
   /**
+   * Removes an answer from history for a given document ID.
+   * Also clears associated highlights and temporary entries if present.
+   */
+  removeAnswer(docId: string, answerId: string) {
+    const currentAnswers = this.getAnswers(docId);
+    const nextAnswers = currentAnswers.filter(
+      (answer) => answer.id !== answerId
+    );
+
+    if (nextAnswers.length !== currentAnswers.length) {
+      this.answers.set(docId, nextAnswers);
+      this.answerHighlightManager.removeAnswer(answerId);
+      this.removeAnswerSpansMap(answerId);
+      this.syncPaperToLocalStorage(docId);
+    }
+
+    this.removeTemporaryAnswer(answerId);
+  }
+
+  /**
    * Adds a new temporary answer for a given document ID.
    * @param docId The ID of the document.
-   * @param answer The temporary LumiAnswer object to add.
+   * @param answer The temporary ElowenAnswer object to add.
    * @param collapseOthers Whether to collapse other answers.
    */
-  addTemporaryAnswer(answer: LumiAnswer, collapseOthers = true) {
+  addTemporaryAnswer(answer: ElowenAnswer, collapseOthers = true) {
     this.temporaryAnswers.push(answer);
 
     if (collapseOthers) {
@@ -200,7 +246,7 @@ export class HistoryService extends Service {
   /**
    * Removes a temporary answer for a given document ID.
    * @param docId The ID of the document.
-   * @param answerId The ID of the temporary LumiAnswer object to remove.
+   * @param answerId The ID of the temporary ElowenAnswer object to remove.
    */
   removeTemporaryAnswer(answerId: string) {
     const answerIndex = this.temporaryAnswers.findIndex(
@@ -214,9 +260,9 @@ export class HistoryService extends Service {
   /**
    * Retrieves the temporary answer history for a given document ID.
    * @param docId The ID of the document.
-   * @returns An array of LumiAnswer objects, or an empty array if none exist.
+   * @returns An array of ElowenAnswer objects, or an empty array if none exist.
    */
-  getTemporaryAnswers(): LumiAnswer[] {
+  getTemporaryAnswers(): ElowenAnswer[] {
     return this.temporaryAnswers;
   }
 
@@ -230,10 +276,39 @@ export class HistoryService extends Service {
   /**
    * Adds a new personal summary for a given document ID.
    * @param docId The ID of the document.
-   * @param summary The LumiAnswer object to add.
+   * @param summary The ElowenAnswer object to add.
    */
-  addPersonalSummary(docId: string, summary: LumiAnswer) {
+  addPersonalSummary(docId: string, summary: ElowenAnswer) {
     this.personalSummaries.set(docId, summary);
+    this.syncPaperToLocalStorage(docId);
+  }
+
+  addAnnotation(docId: string, annotation: UserAnnotation) {
+    const currentAnnotations = this.getAnnotations(docId);
+    this.annotations.set(docId, [annotation, ...currentAnnotations]);
+    this.userHighlightManager.addAnnotation(annotation);
+    this.syncPaperToLocalStorage(docId);
+  }
+
+  updateAnnotation(docId: string, annotation: UserAnnotation) {
+    const currentAnnotations = this.getAnnotations(docId);
+    this.annotations.set(
+      docId,
+      currentAnnotations.map((item) =>
+        item.id === annotation.id ? annotation : item
+      )
+    );
+    this.userHighlightManager.updateAnnotation(annotation);
+    this.syncPaperToLocalStorage(docId);
+  }
+
+  removeAnnotation(docId: string, annotationId: string) {
+    const currentAnnotations = this.getAnnotations(docId);
+    this.annotations.set(
+      docId,
+      currentAnnotations.filter((item) => item.id !== annotationId)
+    );
+    this.userHighlightManager.removeAnnotation(annotationId);
     this.syncPaperToLocalStorage(docId);
   }
 
@@ -294,9 +369,17 @@ export class HistoryService extends Service {
    * @param docId The ID of the document to delete.
    */
   deletePaper(docId: string) {
+    for (const answer of this.getAnswers(docId)) {
+      this.answerHighlightManager.removeAnswer(answer.id);
+      this.removeAnswerSpansMap(answer.id);
+    }
+    for (const annotation of this.getAnnotations(docId)) {
+      this.userHighlightManager.removeAnnotation(annotation.id);
+    }
     this.paperMetadata.delete(docId);
     this.answers.delete(docId);
     this.personalSummaries.delete(docId);
+    this.annotations.delete(docId);
     this.sp.localStorageService.deleteData(`${PAPER_KEY_PREFIX}${docId}`);
   }
 
@@ -311,7 +394,9 @@ export class HistoryService extends Service {
     this.paperMetadata.clear();
     this.answers.clear();
     this.personalSummaries.clear();
+    this.annotations.clear();
     this.answerHighlightManager.clearHighlights();
+    this.userHighlightManager.clearHighlights();
     this.spanIdToAnswerIdMap.clear();
   }
 
@@ -335,6 +420,7 @@ export class HistoryService extends Service {
       ...paperData,
       history: this.getAnswers(docId),
       personalSummary: this.personalSummaries.get(docId),
+      annotations: this.getAnnotations(docId),
     };
 
     this.sp.localStorageService.setData(

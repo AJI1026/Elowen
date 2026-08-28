@@ -15,7 +15,7 @@
 
 from dataclasses import dataclass
 from typing import Any, List, Optional
-from shared.lumi_doc import LumiContent, Position
+from shared.elowen_doc import ElowenContent, Position
 
 
 @dataclass
@@ -35,22 +35,24 @@ class ImageInfo:
 
 
 @dataclass
-class LumiAnswerRequest:
-    """Request object for getting a Lumi answer."""
+class ElowenAnswerRequest:
+    """Request object for getting a Elowen answer."""
 
     query: Optional[str] = None
     highlight: Optional[str] = None
     highlighted_spans: Optional[List[HighlightSelection]] = None
     image: Optional[ImageInfo] = None
+    # "mindmap" requests a nested logic map instead of a short prose answer.
+    response_mode: Optional[str] = None
 
 
 @dataclass
-class LumiAnswer:
-    """A Lumi answer object, containing the response and citations."""
+class ElowenAnswer:
+    """A Elowen answer object, containing the response and citations."""
 
     id: str
-    request: LumiAnswerRequest
-    response_content: List[LumiContent]
+    request: ElowenAnswerRequest
+    response_content: List[ElowenContent]
     timestamp: int
 
 
@@ -66,7 +68,7 @@ class QueryLog:
         # to Firestore timestamp when written)
         Any
     )
-    answer: LumiAnswer
+    answer: ElowenAnswer
     arxiv_id: str
     version: str
 

@@ -58,6 +58,13 @@ a {
   gap: common.$spacing-xl;
 }
 
+.about-text {
+  @include typescale.body-medium;
+  color: var(--md-sys-color-on-surface-variant);
+  max-width: 42rem;
+  line-height: 1.6;
+}
+
 pr-textinput {
   min-width: min(100%, 300px);
 }

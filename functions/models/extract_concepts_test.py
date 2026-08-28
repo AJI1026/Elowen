@@ -16,10 +16,10 @@
 import unittest
 from unittest.mock import patch
 from models import extract_concepts
-from shared.lumi_doc import (
-    LumiConcept,
+from shared.elowen_doc import (
+    ElowenConcept,
     ConceptContent,
-    LumiSpan,
+    ElowenSpan,
     InnerTagName,
 )
 
@@ -49,10 +49,10 @@ VALID_CONCEPTS_OBJECT = extract_concepts.LLMResponseSchema(
 
 
 class TestExtractConcepts(unittest.TestCase):
-    def test_parse_lumi_concepts(self):
+    def test_parse_elowen_concepts(self):
         with self.subTest("extract valid concepts"):
             expected_concepts = [
-                LumiConcept(
+                ElowenConcept(
                     id="concept-0",
                     name="Large Language Models",
                     contents=[
@@ -63,7 +63,7 @@ class TestExtractConcepts(unittest.TestCase):
                     ],
                     in_text_citations=[],
                 ),
-                LumiConcept(
+                ElowenConcept(
                     id="concept-1",
                     name="Semantic Search",
                     contents=[
@@ -75,7 +75,7 @@ class TestExtractConcepts(unittest.TestCase):
                     in_text_citations=[],
                 ),
             ]
-            actual_concepts = extract_concepts.parse_lumi_concepts(
+            actual_concepts = extract_concepts.parse_elowen_concepts(
                 VALID_CONCEPTS_OBJECT
             )
 
@@ -85,14 +85,14 @@ class TestExtractConcepts(unittest.TestCase):
 
         with self.subTest("empty concepts list"):
             expected_concepts = []
-            actual_concepts = extract_concepts.parse_lumi_concepts(
+            actual_concepts = extract_concepts.parse_elowen_concepts(
                 extract_concepts.LLMResponseSchema(concepts=[])
             )
             self.assertEqual(expected_concepts, actual_concepts)
 
         with self.subTest("None input"):
             expected_concepts = []
-            actual_concepts = extract_concepts.parse_lumi_concepts(None)
+            actual_concepts = extract_concepts.parse_elowen_concepts(None)
             self.assertEqual(expected_concepts, actual_concepts)
 
 
@@ -100,14 +100,14 @@ class TestAnnotateConceptsInPlace(unittest.TestCase):
     def test_annotates_single_concept(self):
         """Tests that a single concept is correctly identified and tagged."""
         spans = [
-            LumiSpan(
+            ElowenSpan(
                 id="s1",
                 text="This paper is about Large Language Models.",
                 inner_tags=[],
             )
         ]
         concepts = [
-            LumiConcept(
+            ElowenConcept(
                 id="c1", name="Large Language Models", contents=[], in_text_citations=[]
             )
         ]
@@ -124,18 +124,18 @@ class TestAnnotateConceptsInPlace(unittest.TestCase):
     def test_annotates_multiple_concepts_and_spans(self):
         """Tests annotation across multiple spans and with multiple concepts."""
         spans = [
-            LumiSpan(id="s1", text="We use Semantic Search.", inner_tags=[]),
-            LumiSpan(
+            ElowenSpan(id="s1", text="We use Semantic Search.", inner_tags=[]),
+            ElowenSpan(
                 id="s2",
                 text="The future is Large Language Models.",
                 inner_tags=[],
             ),
         ]
         concepts = [
-            LumiConcept(
+            ElowenConcept(
                 id="c1", name="Large Language Models", contents=[], in_text_citations=[]
             ),
-            LumiConcept(
+            ElowenConcept(
                 id="c2", name="Semantic Search", contents=[], in_text_citations=[]
             ),
         ]
@@ -158,9 +158,9 @@ class TestAnnotateConceptsInPlace(unittest.TestCase):
 
     def test_no_concept_in_text(self):
         """Tests that no tags are added if the concept name is not in the text."""
-        spans = [LumiSpan(id="s1", text="This is a simple sentence.", inner_tags=[])]
+        spans = [ElowenSpan(id="s1", text="This is a simple sentence.", inner_tags=[])]
         concepts = [
-            LumiConcept(
+            ElowenConcept(
                 id="c1", name="Nonexistent Concept", contents=[], in_text_citations=[]
             )
         ]

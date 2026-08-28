@@ -25,7 +25,7 @@ project_root = os.path.abspath(os.path.join(script_dir, ".."))
 sys.path.insert(0, project_root)
 
 from models.extract_concepts import extract_concepts
-from shared.lumi_doc import LumiConcept
+from shared.elowen_doc import ElowenConcept
 
 DUMMY_ABSTRACT = """
 Large Language Models (LLMs) are advanced AI models capable of understanding and generating human language.
@@ -34,9 +34,9 @@ going beyond simple keyword matching. This allows for more relevant and accurate
 """
 
 
-def print_lumi_concepts(concepts: List[LumiConcept]):
-    """Prints the components of a list of LumiConcepts in a readable format."""
-    print("\n--- Lumi Concepts Output ---")
+def print_elowen_concepts(concepts: List[ElowenConcept]):
+    """Prints the components of a list of ElowenConcepts in a readable format."""
+    print("\n--- Elowen Concepts Output ---")
     if not concepts:
         print("  No concepts were extracted.")
     else:
@@ -55,4 +55,4 @@ if __name__ == "__main__":
     print("Concept extraction complete.")
 
     print("Printing extracted concepts:")
-    print_lumi_concepts(extracted_concepts)
+    print_elowen_concepts(extracted_concepts)

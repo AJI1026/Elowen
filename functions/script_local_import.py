@@ -15,11 +15,11 @@
 
 """Script for running import pipeline locally
 
-Running this script will import and process an arXiv paper into a LumiDoc, saving it
+Running this script will import and process an arXiv paper into a ElowenDoc, saving it
 out to frontend/loaded_documents and saving images to local_image_bucket/{arXiv_id}/...
 
 The paper can then be viewed in storybook by configuring the paper import path
-in `lumi_doc.stories.ts`.
+in `elowen_doc.stories.ts`.
 """
 
 import json
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     print(f"  > extract_concepts took: {time.time() - last_time:.2f}s")
     last_time = time.time()
 
-    lumi_doc, _ = import_pipeline.import_arxiv_latex_and_pdf(
+    elowen_doc, _ = import_pipeline.import_arxiv_latex_and_pdf(
         arxiv_id,
         version,
         concepts,
@@ -91,19 +91,19 @@ if __name__ == "__main__":
         print("🍭 Skipped summary generation...")
     else:
         print("🍭 Generating summaries...")
-        lumi_doc.summaries = summaries.generate_lumi_summaries(lumi_doc)
+        elowen_doc.summaries = summaries.generate_elowen_summaries(elowen_doc)
 
-        print(f"  > generate_lumi_summaries took: {time.time() - last_time:.2f}s")
+        print(f"  > generate_elowen_summaries took: {time.time() - last_time:.2f}s")
         last_time = time.time()
 
     output_path = f"../frontend/src/.examples/paper_{arxiv_id}.ts"
     print(f"🍭 Writing output to: ", output_path)
     with open(output_path, "w+") as file:
-        converted_camel = convert_keys(asdict(lumi_doc), "snake_to_camel")
-        file_content = f"""import {{ LumiDoc }} from "../shared/lumi_doc";
+        converted_camel = convert_keys(asdict(elowen_doc), "snake_to_camel")
+        file_content = f"""import {{ ElowenDoc }} from "../shared/elowen_doc";
 
 // Example arxiv document with id `{arxiv_id}` loaded using import script.
-export const paper: LumiDoc = {json.dumps(converted_camel)};"""
+export const paper: ElowenDoc = {json.dumps(converted_camel)};"""
         file.write(file_content)
 
     print(f"🍭 Total time: {time.time() - start_time:.2f}s")

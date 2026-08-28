@@ -1,0 +1,77 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@use "../../sass/common";
+@use "../../sass/typescale";
+
+:host {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+/* Quiet text toggle — matches header icon-button weight, not a filled CTA. */
+.language-toggle {
+  @include common.flex-row-align-center;
+  gap: 2px;
+  height: 40px;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+}
+
+.lang-button {
+  @include typescale.label-large;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: none;
+  border-radius: common.$border-radius-medium;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  line-height: 1;
+
+  &:hover:not(.selected) {
+    color: var(--md-sys-color-on-surface);
+    background-color: color-mix(
+      in srgb,
+      var(--md-sys-color-on-surface) 8%,
+      transparent
+    );
+  }
+
+  &.selected {
+    color: var(--md-sys-color-primary);
+    font-weight: 700;
+    background: transparent;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 1px;
+  }
+}
+
+.lang-sep {
+  @include typescale.label-medium;
+  color: var(--md-sys-color-outline-variant);
+  user-select: none;
+  padding: 0 1px;
+}

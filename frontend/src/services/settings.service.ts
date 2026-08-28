@@ -20,11 +20,14 @@ import { Service } from "./service";
 
 import { ColorMode } from "../shared/types";
 import {
-  DEFAULT_BASE_URLS,
   DEFAULT_MODEL_CONFIG,
-  DEFAULT_MODEL_NAMES,
   ModelConfig,
   ModelProvider,
+  ProviderSettings,
+  ProviderSettingsMap,
+  ResponseLanguage,
+  UI_MODEL_PROVIDERS,
+  defaultProviderSettings,
 } from "../shared/model_config";
 
 import {
@@ -38,10 +41,14 @@ interface ServiceProvider {
 
 const TOS_CONFIRMED_LOCAL_STORAGE_KEY = "tosConfirmed";
 const TUTORIAL_CONFIRMED_LOCAL_STORAGE_KEY = "tutorialConfirmed";
-const API_KEY_LOCAL_STORAGE_KEY = "userApiKey";
 const MODEL_PROVIDER_LOCAL_STORAGE_KEY = "userModelProvider";
-const MODEL_NAME_LOCAL_STORAGE_KEY = "userModelName";
-const MODEL_BASE_URL_LOCAL_STORAGE_KEY = "userModelBaseUrl";
+const PROVIDER_SETTINGS_LOCAL_STORAGE_KEY = "userProviderSettings";
+const RESPONSE_LANGUAGE_LOCAL_STORAGE_KEY = "userResponseLanguage";
+
+// Legacy single-slot keys (migrated once into per-provider map).
+const LEGACY_API_KEY_LOCAL_STORAGE_KEY = "userApiKey";
+const LEGACY_MODEL_NAME_LOCAL_STORAGE_KEY = "userModelName";
+const LEGACY_MODEL_BASE_URL_LOCAL_STORAGE_KEY = "userModelBaseUrl";
 
 /**
  * Settings service.
@@ -60,73 +67,195 @@ export class SettingsService extends Service {
         TUTORIAL_CONFIRMED_LOCAL_STORAGE_KEY,
         false
       );
-    this.apiKey = this.sp.localStorageService.makeLocalStorageHelper(
-      API_KEY_LOCAL_STORAGE_KEY,
-      ""
-    );
     this.modelProvider = this.sp.localStorageService.makeLocalStorageHelper(
       MODEL_PROVIDER_LOCAL_STORAGE_KEY,
-      ModelProvider.GEMINI
+      ModelProvider.DEEPSEEK
     );
-    this.modelName = this.sp.localStorageService.makeLocalStorageHelper(
-      MODEL_NAME_LOCAL_STORAGE_KEY,
-      DEFAULT_MODEL_CONFIG.modelName
+    this.providerSettings =
+      this.sp.localStorageService.makeLocalStorageHelper<ProviderSettingsMap>(
+        PROVIDER_SETTINGS_LOCAL_STORAGE_KEY,
+        {}
+      );
+    this.responseLanguage = this.sp.localStorageService.makeLocalStorageHelper(
+      RESPONSE_LANGUAGE_LOCAL_STORAGE_KEY,
+      ResponseLanguage.ZH
     );
-    this.modelBaseUrl = this.sp.localStorageService.makeLocalStorageHelper(
-      MODEL_BASE_URL_LOCAL_STORAGE_KEY,
-      ""
-    );
+
+    this.migrateLegacySettings();
+    this.ensureUiProvider();
+    this.syncActiveFieldsFromProvider();
   }
 
   @observable colorMode: ColorMode = ColorMode.DEFAULT;
 
+  /** Active fields bound by the Settings UI (synced with current provider). */
+  @observable apiKey = "";
+  @observable modelName = DEFAULT_MODEL_CONFIG.modelName;
+  @observable modelBaseUrl = DEFAULT_MODEL_CONFIG.baseUrl;
+
   readonly isTosConfirmed: LocalStorageHelper<boolean>;
   readonly isTutorialConfirmed: LocalStorageHelper<boolean>;
-  readonly apiKey: LocalStorageHelper<string>;
   readonly modelProvider: LocalStorageHelper<ModelProvider>;
-  readonly modelName: LocalStorageHelper<string>;
-  readonly modelBaseUrl: LocalStorageHelper<string>;
+  readonly providerSettings: LocalStorageHelper<ProviderSettingsMap>;
+  readonly responseLanguage: LocalStorageHelper<ResponseLanguage>;
 
   /** Returns the full model config for the current settings. */
   getModelConfig(): ModelConfig {
+    const provider = this.normalizeProvider(this.modelProvider.value);
+    const saved = this.getProviderSettings(provider);
     return {
-      provider: this.modelProvider.value,
-      modelName: this.modelName.value,
-      baseUrl: this.modelBaseUrl.value,
-      apiKey: this.apiKey.value,
+      provider,
+      modelName: saved.modelName,
+      baseUrl: saved.baseUrl,
+      apiKey: saved.apiKey,
+      responseLanguage: this.responseLanguage.value,
     };
   }
 
   /** Applies a model config to the stored settings. */
   setModelConfig(config: Partial<ModelConfig>) {
+    if (config.responseLanguage !== undefined) {
+      this.responseLanguage.value = config.responseLanguage;
+    }
+
     if (config.provider !== undefined) {
-      this.modelProvider.value = config.provider;
+      this.selectProvider(config.provider);
     }
-    if (config.modelName !== undefined) {
-      this.modelName.value = config.modelName;
-    }
-    if (config.baseUrl !== undefined) {
-      this.modelBaseUrl.value = config.baseUrl;
-    }
-    if (config.apiKey !== undefined) {
-      this.apiKey.value = config.apiKey;
-    }
+
+    const provider = this.normalizeProvider(this.modelProvider.value);
+    const next: ProviderSettings = {
+      ...this.getProviderSettings(provider),
+    };
+    if (config.modelName !== undefined) next.modelName = config.modelName;
+    if (config.baseUrl !== undefined) next.baseUrl = config.baseUrl;
+    if (config.apiKey !== undefined) next.apiKey = config.apiKey;
+    this.writeProviderSettings(provider, next);
+    this.syncActiveFieldsFromProvider();
   }
 
-  /** Pre-fill model name/base URL when switching provider (if user hasn't set). */
+  /** Switch provider; each provider keeps its own name / URL / key. */
+  selectProvider(provider: ModelProvider) {
+    const next = this.normalizeProvider(provider);
+    this.persistActiveFieldsToProvider();
+    this.modelProvider.value = next;
+    this.ensureProviderDefaults(next);
+    this.syncActiveFieldsFromProvider();
+  }
+
+  /** @deprecated Use selectProvider. */
   applyProviderDefaults(provider: ModelProvider) {
-    this.modelProvider.value = provider;
-    const defaultName = DEFAULT_MODEL_NAMES[provider];
-    const defaultBaseUrl = DEFAULT_BASE_URLS[provider];
-    if (defaultName) {
-      this.modelName.value = defaultName;
-    }
-    if (defaultBaseUrl !== undefined) {
-      this.modelBaseUrl.value = defaultBaseUrl;
-    }
+    this.selectProvider(provider);
+  }
+
+  /** Persist edits from the Settings form into the current provider slot. */
+  updateActiveApiKey(apiKey: string) {
+    this.apiKey = apiKey;
+    this.persistActiveFieldsToProvider();
+  }
+
+  updateActiveModelName(modelName: string) {
+    this.modelName = modelName;
+    this.persistActiveFieldsToProvider();
+  }
+
+  updateActiveBaseUrl(baseUrl: string) {
+    this.modelBaseUrl = baseUrl;
+    this.persistActiveFieldsToProvider();
   }
 
   @action setColorMode(colorMode: ColorMode) {
     this.colorMode = colorMode;
+  }
+
+  private normalizeProvider(provider: ModelProvider): ModelProvider {
+    if (UI_MODEL_PROVIDERS.includes(provider)) return provider;
+    return ModelProvider.DEEPSEEK;
+  }
+
+  private ensureUiProvider() {
+    const current = this.modelProvider.value;
+    const normalized = this.normalizeProvider(current);
+    if (current !== normalized) {
+      this.modelProvider.value = normalized;
+    }
+    this.ensureProviderDefaults(normalized);
+  }
+
+  private ensureProviderDefaults(provider: ModelProvider) {
+    const map = { ...this.providerSettings.value };
+    if (!map[provider]) {
+      map[provider] = defaultProviderSettings(provider);
+      this.providerSettings.value = map;
+    }
+  }
+
+  private getProviderSettings(provider: ModelProvider): ProviderSettings {
+    return (
+      this.providerSettings.value[provider] ??
+      defaultProviderSettings(provider)
+    );
+  }
+
+  private writeProviderSettings(
+    provider: ModelProvider,
+    settings: ProviderSettings
+  ) {
+    this.providerSettings.value = {
+      ...this.providerSettings.value,
+      [provider]: settings,
+    };
+  }
+
+  private persistActiveFieldsToProvider() {
+    const provider = this.normalizeProvider(this.modelProvider.value);
+    this.writeProviderSettings(provider, {
+      modelName: this.modelName,
+      baseUrl: this.modelBaseUrl,
+      apiKey: this.apiKey,
+    });
+  }
+
+  private syncActiveFieldsFromProvider() {
+    const provider = this.normalizeProvider(this.modelProvider.value);
+    const saved = this.getProviderSettings(provider);
+    this.modelName = saved.modelName;
+    this.modelBaseUrl = saved.baseUrl;
+    this.apiKey = saved.apiKey;
+  }
+
+  /** One-time migrate from shared key/name/url into per-provider map. */
+  private migrateLegacySettings() {
+    if (Object.keys(this.providerSettings.value).length > 0) return;
+
+    const legacyKey = this.readLegacyString(LEGACY_API_KEY_LOCAL_STORAGE_KEY);
+    const legacyName = this.readLegacyString(LEGACY_MODEL_NAME_LOCAL_STORAGE_KEY);
+    const legacyBase = this.readLegacyString(
+      LEGACY_MODEL_BASE_URL_LOCAL_STORAGE_KEY
+    );
+    if (!legacyKey && !legacyName && !legacyBase) return;
+
+    let provider = this.normalizeProvider(this.modelProvider.value);
+    // Old default was Gemini; treat leftover gemini as DeepSeek slot.
+    if (this.modelProvider.value === ModelProvider.GEMINI) {
+      provider = ModelProvider.DEEPSEEK;
+      this.modelProvider.value = provider;
+    }
+
+    const defaults = defaultProviderSettings(provider);
+    this.writeProviderSettings(provider, {
+      modelName: legacyName || defaults.modelName,
+      baseUrl: legacyBase || defaults.baseUrl,
+      apiKey: legacyKey || "",
+    });
+  }
+
+  private readLegacyString(key: string): string {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw == null) return "";
+      return JSON.parse(raw) as string;
+    } catch {
+      return "";
+    }
   }
 }

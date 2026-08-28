@@ -19,7 +19,7 @@
 @use "./sass/common";
 @use "./sass/typescale";
 
-lumi-app {
+elowen-app {
   @include common.full-percentage;
   display: block;
 }

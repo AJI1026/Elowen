@@ -16,7 +16,7 @@
  */
 
 import { CITATION_CLASSNAME, FOOTNOTE_CLASSNAME } from "./constants";
-import { Position } from "./lumi_doc";
+import { Position } from "./elowen_doc";
 
 // Helper to find a parent element matching a condition
 function findParent(
@@ -41,7 +41,7 @@ export interface HighlightSelection {
 
 /**
  * An interface describing the information returned for a valid text selection
- * within a <lumi-span> element.
+ * within a <elowen-span> element.
  */
 export interface SelectionInfo {
   selectedText: string;
@@ -50,22 +50,85 @@ export interface SelectionInfo {
 }
 
 /**
- * Given a text node contained in a <lumi-span>, find the character offset from the start of the
- * containing <lumi-span> element.
+ * KaTeX DOM selection often inserts a newline between every math token
+ * (e.g. "o\\ng\\n" for $o_g$). Collapse that into readable horizontal text.
  */
-function getOffsetInLumiSpan(textNode: Node): number {
+export function normalizeSelectionText(text: string): string {
+  const trimmed = text.replace(/\r\n/g, "\n").trim();
+  if (!trimmed.includes("\n")) {
+    return trimmed;
+  }
+
+  const lines = trimmed
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (lines.length <= 1) {
+    return lines[0] ?? "";
+  }
+
+  const shortLineRatio =
+    lines.filter((line) => line.length <= 16).length / lines.length;
+  // Mostly fragmented tokens from KaTeX / inline markup.
+  if (shortLineRatio >= 0.5) {
+    let out = "";
+    for (const line of lines) {
+      if (!out) {
+        out = line;
+        continue;
+      }
+      const prev = out[out.length - 1] ?? "";
+      const afterEnglishWord =
+        /[A-Za-z]{3,}$/.test(out) && /^[A-Za-zτσαβγ]$/.test(line);
+      const tightGlue =
+        !afterEnglishWord &&
+        (line.length <= 2 ||
+          /^[^\w\s]$/.test(line) ||
+          /^[^\w\s]$/.test(prev) ||
+          /^(max|min|mid|sin|cos|tan|log|exp|inf|sup|lim|arg|mod)$/i.test(
+            line
+          ));
+      out += tightGlue ? line : ` ${line}`;
+    }
+    return out.replace(/[ \t]{2,}/g, " ").trim();
+  }
+
+  // Ordinary multi-line selection: join with spaces.
+  return lines.join(" ").replace(/[ \t]{2,}/g, " ").trim();
+}
+
+/** True when text looks like KaTeX/tokenized clipboard fragmentation. */
+export function looksLikeFragmentedClipboardText(text: string): boolean {
+  if (!text.includes("\n")) return false;
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 3) return false;
+  const shortLineRatio =
+    lines.filter((line) => line.length <= 16).length / lines.length;
+  return shortLineRatio >= 0.5;
+}
+
+/**
+ * Given a text node contained in a <elowen-span>, find the character offset from the start of the
+ * containing <elowen-span> element.
+ */
+function getOffsetInElowenSpan(textNode: Node): number {
   const characterSpan = textNode.parentElement;
   if (!characterSpan) return -1;
 
-  const lumiSpanRendererElement = characterSpan.parentElement;
-  if (!lumiSpanRendererElement) return -1;
+  const elowenSpanRendererElement = characterSpan.parentElement;
+  if (!elowenSpanRendererElement) return -1;
 
-  const lumiSpanRendererChildren = Array.from(lumiSpanRendererElement.children);
-  const spanIndex = lumiSpanRendererChildren.indexOf(characterSpan);
+  const elowenSpanRendererChildren = Array.from(elowenSpanRendererElement.children);
+  const spanIndex = elowenSpanRendererChildren.indexOf(characterSpan);
 
   let inlineTagOffset = 0;
 
-  for (const element of lumiSpanRendererChildren.slice(0, spanIndex)) {
+  for (const element of elowenSpanRendererChildren.slice(0, spanIndex)) {
     if (
       Array.from(element.classList).includes(CITATION_CLASSNAME) ||
       Array.from(element.classList).includes(FOOTNOTE_CLASSNAME)
@@ -79,14 +142,14 @@ function getOffsetInLumiSpan(textNode: Node): number {
 
 /**
  * Processes a `Selection` object to extract information about text selected
- * within a <lumi-span> element, accounting for Shadow DOM boundaries.
+ * within a <elowen-span> element, accounting for Shadow DOM boundaries.
  *
  * @param selection The `Selection` object from `window.getSelection()`.
  * @param shadowRoot The `shadowRoot` of the component where selection occurs.
  * @returns A `SelectionInfo` object if a valid selection is found, otherwise `null`.
  */
 export function getSelectionInfo(selection: Selection): SelectionInfo | null {
-  const selectedText = selection.toString().trim();
+  const selectedText = normalizeSelectionText(selection.toString());
   if (selectedText.length === 0) {
     return null;
   }
@@ -96,54 +159,54 @@ export function getSelectionInfo(selection: Selection): SelectionInfo | null {
     return null;
   }
 
-  const startLumiSpan = findParent(
+  const startElowenSpan = findParent(
     range.startContainer,
-    (el) => el.tagName.toLowerCase() === "lumi-span"
+    (el) => el.tagName.toLowerCase() === "elowen-span"
   );
 
-  const endLumiSpan = findParent(
+  const endElowenSpan = findParent(
     range.endContainer,
-    (el) => el.tagName.toLowerCase() === "lumi-span"
+    (el) => el.tagName.toLowerCase() === "elowen-span"
   );
 
-  if (!startLumiSpan || !endLumiSpan || !startLumiSpan.id || !endLumiSpan.id) {
+  if (!startElowenSpan || !endElowenSpan || !startElowenSpan.id || !endElowenSpan.id) {
     return null;
   }
 
   const highlightSelection: HighlightSelection[] = [];
-  const allLumiSpans: HTMLElement[] = [startLumiSpan];
+  const allElowenSpans: HTMLElement[] = [startElowenSpan];
 
-  // If selection spans multiple lumi-spans, collect them all
-  if (startLumiSpan !== endLumiSpan) {
-    let current: Element | null = startLumiSpan;
-    while (current && current !== endLumiSpan) {
+  // If selection spans multiple elowen-spans, collect them all
+  if (startElowenSpan !== endElowenSpan) {
+    let current: Element | null = startElowenSpan;
+    while (current && current !== endElowenSpan) {
       current = current.nextElementSibling;
       if (
         current instanceof HTMLElement &&
-        current.tagName.toLowerCase() === "lumi-span"
+        current.tagName.toLowerCase() === "elowen-span"
       ) {
-        allLumiSpans.push(current);
+        allElowenSpans.push(current);
       }
     }
   }
 
-  for (const lumiSpan of allLumiSpans) {
-    if (!lumiSpan.id) continue;
+  for (const elowenSpan of allElowenSpans) {
+    if (!elowenSpan.id) continue;
 
     // Default for the middle spans is to give the
     // full offset, from the first to last character.
     let startOffset = 0;
-    let endOffset = lumiSpan.textContent?.length ?? 0;
+    let endOffset = elowenSpan.textContent?.length ?? 0;
 
-    if (lumiSpan === startLumiSpan) {
-      startOffset = getOffsetInLumiSpan(range.startContainer);
+    if (elowenSpan === startElowenSpan) {
+      startOffset = getOffsetInElowenSpan(range.startContainer);
     }
-    if (lumiSpan === endLumiSpan) {
-      endOffset = getOffsetInLumiSpan(range.endContainer);
+    if (elowenSpan === endElowenSpan) {
+      endOffset = getOffsetInElowenSpan(range.endContainer);
     }
 
     highlightSelection.push({
-      spanId: lumiSpan.id,
+      spanId: elowenSpan.id,
       position: { startIndex: startOffset, endIndex: endOffset + 1 },
     });
   }

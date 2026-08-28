@@ -16,15 +16,15 @@
  */
 
 import { action, makeObservable, observable } from "mobx";
-import { Highlight } from "./lumi_doc";
-import { LumiAnswer } from "./api";
+import { Highlight } from "./elowen_doc";
+import { ElowenAnswer } from "./api";
 import { HighlightManagerBase } from "./highlight_manager";
 import { HIGHLIGHT_METADATA_ANSWER_KEY } from "./constants";
 
 const ANSWER_HIGHLIGHT_COLOR = "green";
 
 /**
- * Manages the persistent highlight state of spans derived from LumiAnswers.
+ * Manages the persistent highlight state of spans derived from ElowenAnswers.
  */
 export class AnswerHighlightManager extends HighlightManagerBase {
   override getObservables() {
@@ -32,6 +32,7 @@ export class AnswerHighlightManager extends HighlightManagerBase {
       ...super.getObservables(),
       populateFromAnswers: action,
       addAnswer: action,
+      removeAnswer: action,
     };
   }
 
@@ -39,7 +40,7 @@ export class AnswerHighlightManager extends HighlightManagerBase {
    * Clears existing highlights and populates them from an array of answers.
    * This is typically used on initial load.
    */
-  populateFromAnswers(answers: LumiAnswer[]) {
+  populateFromAnswers(answers: ElowenAnswer[]) {
     this.clearHighlights();
     for (const answer of answers) {
       this.addAnswer(answer);
@@ -49,7 +50,7 @@ export class AnswerHighlightManager extends HighlightManagerBase {
   /**
    * Adds highlights from a single new answer.
    */
-  addAnswer(answer: LumiAnswer) {
+  addAnswer(answer: ElowenAnswer) {
     if (!answer.request.highlightedSpans) {
       return;
     }
@@ -67,6 +68,26 @@ export class AnswerHighlightManager extends HighlightManagerBase {
 
       const existing = this.highlightedSpans.get(spanId) || [];
       this.highlightedSpans.set(spanId, [...existing, highlight]);
+    }
+  }
+
+  /**
+   * Removes all highlights associated with a given answer.
+   */
+  removeAnswer(answerId: string) {
+    for (const [spanId, highlights] of this.highlightedSpans.entries()) {
+      const remaining = highlights.filter((highlight) => {
+        const answer = highlight.metadata?.[
+          HIGHLIGHT_METADATA_ANSWER_KEY
+        ] as ElowenAnswer | undefined;
+        return answer?.id !== answerId;
+      });
+
+      if (remaining.length === 0) {
+        this.highlightedSpans.delete(spanId);
+      } else {
+        this.highlightedSpans.set(spanId, remaining);
+      }
     }
   }
 }

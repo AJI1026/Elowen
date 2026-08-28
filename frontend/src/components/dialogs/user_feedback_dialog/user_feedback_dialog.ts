@@ -20,7 +20,7 @@ import "@material/web/textfield/outlined-text-field.js";
 
 import { MobxLitElement } from "@adobe/lit-mobx";
 import { CSSResultGroup, html } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import { core } from "../../../core/core";
 import {
@@ -29,11 +29,12 @@ import {
 } from "../../../services/dialog.service";
 import { FirebaseService } from "../../../services/firebase.service";
 import { RouterService } from "../../../services/router.service";
+import { SettingsService } from "../../../services/settings.service";
 import { SnackbarService } from "../../../services/snackbar.service";
 import { saveUserFeedbackCallable } from "../../../shared/callables";
+import { ResponseLanguage } from "../../../shared/model_config";
+import { t } from "../../../shared/i18n";
 import { styles } from "./user_feedback_dialog.scss";
-import { TextArea } from "../../../pair-components/textarea";
-import { isViewportSmall } from "../../../shared/responsive_utils";
 
 /**
  * The user feedback dialog component.
@@ -45,11 +46,18 @@ export class UserFeedbackDialog extends MobxLitElement {
   private readonly dialogService = core.getService(DialogService);
   private readonly firebaseService = core.getService(FirebaseService);
   private readonly routerService = core.getService(RouterService);
+  private readonly settingsService = core.getService(SettingsService);
   private readonly snackbarService = core.getService(SnackbarService);
 
-  @query("pr-textarea") private textarea?: TextArea;
+  /** Injected by elowen-dialogs so language switches always refresh this UI. */
+  @property({ type: String }) lang: ResponseLanguage = ResponseLanguage.ZH;
+
   @state() private feedbackText = "";
   @state() private isLoading = false;
+
+  private uiLang() {
+    return this.lang || this.settingsService.responseLanguage.value;
+  }
 
   private handleClose() {
     if (this.dialogService) {
@@ -60,6 +68,7 @@ export class UserFeedbackDialog extends MobxLitElement {
   private async handleSend() {
     const arxivId =
       this.routerService.activeRoute.params.document_id ?? undefined;
+    const lang = this.uiLang();
 
     try {
       this.isLoading = true;
@@ -67,21 +76,15 @@ export class UserFeedbackDialog extends MobxLitElement {
         userFeedbackText: this.feedbackText,
         arxivId,
       });
-      this.snackbarService.show("Feedback sent. Thank you!");
+      this.snackbarService.show(t("feedback.snackSuccess", lang));
       this.handleClose();
       this.feedbackText = "";
     } catch (e) {
       console.error("Error sending feedback:", e);
-      this.snackbarService.show("Error: Could not send feedback.");
+      this.snackbarService.show(t("feedback.snackError", lang));
     } finally {
       this.isLoading = false;
     }
-  }
-
-  private handleOpen() {
-    this.updateComplete.then(() => {
-      this.textarea?.focusElement();
-    });
   }
 
   private shouldShowDialog() {
@@ -89,25 +92,25 @@ export class UserFeedbackDialog extends MobxLitElement {
   }
 
   override render() {
+    const lang = this.uiLang();
     return html`
       <pr-dialog
         .showDialog=${this.shouldShowDialog()}
         .onClose=${this.handleClose}
-        .onOpen=${() => this.handleOpen()}
+        enableEscape
       >
-        <div slot="title">User Feedback</div>
+        <div slot="title">${t("feedback.title", lang)}</div>
         <div class="dialog-content">
           <p class="dialog-explanation">
-            If you're experiencing an issue and/or have suggestions, we'd love
-            to hear from you! You're also welcome to
+            ${t("feedback.bodyBefore", lang)}
             <a
-              href="https://github.com/PAIR-code/lumi/discussions/categories/feature-requests"
+              href="https://github.com/AJI1026/Elowen/discussions"
               target="_blank"
-              >submit feature requests on Github</a
-            >.
+              rel="noopener noreferrer"
+              >${t("feedback.githubLink", lang)}</a
+            >${t("feedback.bodyAfter", lang)}
           </p>
           <md-outlined-text-field
-            ?focused=${true}
             type="textarea"
             rows="5"
             .value=${this.feedbackText}
@@ -115,7 +118,8 @@ export class UserFeedbackDialog extends MobxLitElement {
             @input=${(e: InputEvent) => {
               this.feedbackText = (e.target as HTMLTextAreaElement).value;
             }}
-            placeholder="Add feedback here"
+            .placeholder=${t("feedback.placeholder", lang)}
+            label=${t("feedback.placeholder", lang)}
           >
           </md-outlined-text-field>
         </div>
@@ -127,14 +131,14 @@ export class UserFeedbackDialog extends MobxLitElement {
             }}
             variant="default"
             ?disabled=${this.isLoading}
-            >Cancel</pr-button
+            >${t("common.cancel", lang)}</pr-button
           >
           <pr-button
             @click=${this.handleSend}
             ?loading=${this.isLoading}
             ?disabled=${this.feedbackText.trim() === ""}
           >
-            Send
+            ${t("feedback.send", lang)}
           </pr-button>
         </div>
       </pr-dialog>

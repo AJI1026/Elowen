@@ -18,24 +18,21 @@
 import "../../pair-components/button";
 import "../../pair-components/textinput";
 import "./reading_history";
-import "./tos_content";
 
 import { MobxLitElement } from "@adobe/lit-mobx";
-import { CSSResultGroup, html, nothing } from "lit";
+import { CSSResultGroup, html } from "lit";
 import { customElement } from "lit/decorators.js";
 
 import { core } from "../../core/core";
-import { getLumiPaperUrl } from "../../services/router.service";
 import { SettingsService } from "../../services/settings.service";
 
-import { ArxivMetadata } from "../../shared/lumi_doc";
-import { sortPaperDataByTimestamp } from "../../shared/lumi_paper_utils";
 import { ColorMode } from "../../shared/types";
 import {
   DEFAULT_BASE_URLS,
   DEFAULT_MODEL_NAMES,
   ModelProvider,
 } from "../../shared/model_config";
+import { t } from "../../shared/i18n";
 
 import { styles } from "./settings.scss";
 
@@ -46,81 +43,99 @@ export class Settings extends MobxLitElement {
 
   private readonly settingsService = core.getService(SettingsService);
 
+  private uiLang() {
+    return this.settingsService.responseLanguage.value;
+  }
+
+  private isProvider(provider: ModelProvider) {
+    return this.settingsService.modelProvider.value === provider;
+  }
+
   override render() {
+    const lang = this.uiLang();
+    const provider = this.settingsService.modelProvider.value;
+
     return html`
       <div class="settings">
         <div class="section">
           <reading-history showTitle></reading-history>
         </div>
         <div class="section">
-          <h2>Model</h2>
-          <div>
-            Optional: Configure the LLM used for "Ask Lumi" queries inside a
-            paper. Your API key will never be used to import papers.
-          </div>
+          <h2>${t("settings.model", lang)}</h2>
+          <div>${t("settings.modelHelp", lang)}</div>
 
           <div class="field">
             <div class="action-buttons">
               <pr-button
-                color=${this.settingsService.modelProvider.value === ModelProvider.GEMINI ? "primary" : "neutral"}
-                variant=${this.settingsService.modelProvider.value === ModelProvider.GEMINI ? "tonal" : "default"}
-                @click=${() => this.selectProvider(ModelProvider.GEMINI)}
-              >
-                Gemini
-              </pr-button>
-              <pr-button
-                color=${this.settingsService.modelProvider.value === ModelProvider.DEEPSEEK ? "primary" : "neutral"}
-                variant=${this.settingsService.modelProvider.value === ModelProvider.DEEPSEEK ? "tonal" : "default"}
+                color=${this.isProvider(ModelProvider.DEEPSEEK)
+                  ? "primary"
+                  : "neutral"}
+                variant=${this.isProvider(ModelProvider.DEEPSEEK)
+                  ? "tonal"
+                  : "default"}
                 @click=${() => this.selectProvider(ModelProvider.DEEPSEEK)}
               >
-                DeepSeek
+                ${t("settings.providerDeepSeek", lang)}
               </pr-button>
               <pr-button
-                color=${this.settingsService.modelProvider.value === ModelProvider.OPENAI ? "primary" : "neutral"}
-                variant=${this.settingsService.modelProvider.value === ModelProvider.OPENAI ? "tonal" : "default"}
+                color=${this.isProvider(ModelProvider.OPENAI)
+                  ? "primary"
+                  : "neutral"}
+                variant=${this.isProvider(ModelProvider.OPENAI)
+                  ? "tonal"
+                  : "default"}
                 @click=${() => this.selectProvider(ModelProvider.OPENAI)}
               >
-                OpenAI
+                ${t("settings.providerCustom", lang)}
               </pr-button>
             </div>
           </div>
 
           <div class="field">
             <pr-textinput
-              .value=${this.settingsService.modelName.value}
+              .value=${this.settingsService.modelName}
               .onChange=${(e: InputEvent) => {
-                this.settingsService.modelName.value = (e.target as HTMLInputElement).value;
+                this.settingsService.updateActiveModelName(
+                  (e.target as HTMLInputElement).value
+                );
               }}
-              placeholder=${DEFAULT_MODEL_NAMES[this.settingsService.modelProvider.value] ?? "Model name"}
-              label="Model name"
+              placeholder=${DEFAULT_MODEL_NAMES[provider] ??
+              t("settings.modelName", lang)}
+              label=${t("settings.modelName", lang)}
             ></pr-textinput>
           </div>
 
           <div class="field">
             <pr-textinput
-              .value=${this.settingsService.modelBaseUrl.value}
+              .value=${this.settingsService.modelBaseUrl}
               .onChange=${(e: InputEvent) => {
-                this.settingsService.modelBaseUrl.value = (e.target as HTMLInputElement).value;
+                this.settingsService.updateActiveBaseUrl(
+                  (e.target as HTMLInputElement).value
+                );
               }}
-              placeholder=${DEFAULT_BASE_URLS[this.settingsService.modelProvider.value] ?? "https://api.example.com"}
-              label="Base URL (optional)"
+              placeholder=${DEFAULT_BASE_URLS[provider] ??
+              "https://api.example.com/v1"}
+              label=${t("settings.baseUrl", lang)}
             ></pr-textinput>
           </div>
 
           <div class="field">
             <pr-textinput
-              .value=${this.settingsService.apiKey.value}
+              .value=${this.settingsService.apiKey}
               .onChange=${(e: InputEvent) => {
-                this.settingsService.apiKey.value = (e.target as HTMLInputElement).value;
+                this.settingsService.updateActiveApiKey(
+                  (e.target as HTMLInputElement).value
+                );
               }}
-              placeholder="Paste API key here"
-              label="API key"
+              placeholder=${t("settings.apiKeyPlaceholder", lang)}
+              label=${t("settings.apiKey", lang)}
             ></pr-textinput>
           </div>
         </div>
         <div class="section">
-          <h2>About Lumi</h2>
-          <tos-content></tos-content>
+          <h2>${t("settings.about", lang)}</h2>
+          <p class="about-text">${t("settings.aboutIntro", lang)}</p>
+          <p class="about-text">${t("settings.aboutFeatures", lang)}</p>
         </div>
       </div>
     `;
@@ -128,7 +143,7 @@ export class Settings extends MobxLitElement {
 
   /** Applies provider defaults when the user switches provider. */
   private selectProvider(provider: ModelProvider) {
-    this.settingsService.applyProviderDefaults(provider);
+    this.settingsService.selectProvider(provider);
   }
 
   private renderColorModeSection() {

@@ -15,9 +15,18 @@
  * limitations under the License.
  */
 @use "../../../sass/common";
+@use "../../../sass/typescale";
+
+.tutorial-body {
+  @include common.flex-column;
+  gap: common.$spacing-medium;
+  max-width: 640px;
+}
 
 .dialog-explanation {
-  margin-bottom: 24px;
+  margin: 0;
+  @include typescale.body-medium;
+  color: var(--md-sys-color-on-surface);
 }
 
 .images {
@@ -29,12 +38,39 @@
   }
 }
 
+.tutorial-figure {
+  @include common.flex-column;
+  gap: common.$spacing-small;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
 .tutorial-image {
+  display: block;
+  width: 100%;
+  height: auto;
   overflow: hidden;
   border-radius: common.$border-radius-medium;
   border: common.$border;
+  background: var(--md-sys-color-surface-container-low);
+}
 
-  min-width: 200px;
+figcaption {
+  @include typescale.label-medium;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.tip-list {
+  margin: 0;
+  padding-left: 1.2em;
+  @include typescale.body-small;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.5;
+
+  li + li {
+    margin-top: common.$spacing-xs;
+  }
 }
 
 .actions {

@@ -1,0 +1,66 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@use "../../sass/common";
+
+:host {
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.logo-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, #4e8ff8 14%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #4e8ff8;
+    outline-offset: 1px;
+  }
+}
+
+.logo-mark {
+  width: 24px;
+  height: 24px;
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+:host([size="small"]) .logo-button {
+  width: 32px;
+  height: 32px;
+}
+
+:host([size="small"]) .logo-mark {
+  width: 20px;
+  height: 20px;
+}

@@ -23,6 +23,9 @@ import { classMap } from "lit/directives/class-map.js";
 import "../../pair-components/icon";
 
 import { styles } from "./multi_icon_toggle.scss";
+import { core } from "../../core/core";
+import { SettingsService } from "../../services/settings.service";
+import { t } from "../../shared/i18n";
 
 export type Selection = "collapsed" | "indeterminate" | "expanded";
 
@@ -35,6 +38,7 @@ export class MultiIconToggle extends MobxLitElement {
 
   @property({ type: String }) selection: Selection = "collapsed";
 
+  private readonly settingsService = core.getService(SettingsService);
   private readonly onCollapseAll = new Event("onCollapseAll");
   private readonly onExpandAll = new Event("onExpandAll");
 
@@ -47,6 +51,7 @@ export class MultiIconToggle extends MobxLitElement {
   }
 
   override render() {
+    const lang = this.settingsService.responseLanguage.value;
     const collapseClasses = classMap({
       ["selected"]: this.selection === "collapsed",
       ["button-outer"]: true,
@@ -68,14 +73,14 @@ export class MultiIconToggle extends MobxLitElement {
           <pr-icon
             icon="list"
             variant="default"
-            title="Collapse into summaries"
+            title=${t("content.collapseSummaries", lang)}
           ></pr-icon>
         </div>
         <div class=${indeterminateClasses}>
           <pr-icon
             icon="check_indeterminate_small"
             variant="default"
-            title="Mixed state"
+            title=${t("content.mixedState", lang)}
             .disabled=${true}
           ></pr-icon>
         </div>
@@ -83,7 +88,7 @@ export class MultiIconToggle extends MobxLitElement {
           <pr-icon
             icon="article"
             variant="default"
-            title="Expand full paper"
+            title=${t("content.expandPaper", lang)}
           ></pr-icon>
         </div>
       </div>

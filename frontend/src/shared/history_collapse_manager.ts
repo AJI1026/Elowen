@@ -16,7 +16,7 @@
  */
 
 import { action, makeObservable, observable } from "mobx";
-import { LumiAnswer } from "./api";
+import { ElowenAnswer } from "./api";
 
 const INITIAL_ANSWERS_COLLAPSE_STATE = true;
 const FIRST_ANSWER_COLLAPSE_STATE = false;
@@ -36,7 +36,7 @@ export class HistoryCollapseManager {
     });
   }
 
-  initialize(answers: LumiAnswer[]) {
+  initialize(answers: ElowenAnswer[]) {
     answers.forEach((answer, index) => {
       let collapseState = INITIAL_ANSWERS_COLLAPSE_STATE;
       if (index === 0) {

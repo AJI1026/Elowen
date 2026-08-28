@@ -26,6 +26,7 @@ import { SettingsService } from "../../services/settings.service";
 
 import { styles } from "./tos_dialog.scss";
 import { DialogService, TOSDialogProps } from "../../services/dialog.service";
+import { t } from "../../shared/i18n";
 
 /** Terms of service dialog. */
 @customElement("tos-dialog")
@@ -61,13 +62,14 @@ export class TosDialog extends MobxLitElement {
       this.handleClose();
       this.settingsService.isTosConfirmed.value = true;
     };
+    const lang = this.settingsService.responseLanguage.value;
 
     return html`
-      <div slot="title">Welcome to Lumi</div>
+      <div slot="title">${t("tos.welcomeTitle", lang)}</div>
       <tos-content></tos-content>
       <div slot="actions-right">
         <pr-button color="primary" variant="outlined" @click=${handleClick}>
-          Acknowledge
+          ${t("tos.acknowledge", lang)}
         </pr-button>
       </div>
     `;

@@ -1,0 +1,158 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@use "../../sass/common";
+@use "../../sass/typescale";
+
+elowen-content-summary {
+  display: block;
+  grid-column: 2;
+  align-self: start;
+}
+
+.content-summary-renderer-container {
+  grid-column: 2;
+  align-self: start;
+  padding-top: 0;
+  padding-right: common.$spacing-medium;
+
+  @include common.viewport-small {
+    padding-right: 0;
+  }
+}
+
+.summary-card {
+  @include common.flex-column;
+  gap: common.$spacing-medium;
+  padding: common.$spacing-xl common.$spacing-large;
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: common.$border-radius-medium;
+  max-width: 340px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+
+  @include common.viewport-small {
+    max-width: none;
+    border-radius: common.$border-radius-medium 0 0 common.$border-radius-medium;
+  }
+}
+
+.main-summary {
+  @include typescale.body-medium;
+  color: var(--md-sys-color-on-surface);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.purpose-summary {
+  @include typescale.body-small;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.45;
+  padding-top: common.$spacing-xs;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.key-points-section {
+  @include common.flex-row;
+  align-items: flex-start;
+  gap: common.$spacing-small;
+}
+
+.key-points-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+
+  --pr-icon-color: var(--md-sys-color-on-surface-variant);
+
+  .toggle-icon {
+    transition: transform 0.15s ease;
+  }
+
+  &.expanded .toggle-icon {
+    transform: rotate(90deg);
+  }
+}
+
+.key-points-list {
+  @include common.flex-column;
+  gap: common.$spacing-small;
+  margin: 0;
+  padding: common.$spacing-small common.$spacing-medium;
+  list-style: none;
+  flex: 1;
+  min-width: 0;
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: common.$border-radius-small;
+}
+
+.key-point-item {
+  @include typescale.label-medium;
+  display: flex;
+  align-items: baseline;
+  gap: common.$spacing-small;
+  color: var(--md-sys-color-on-surface-variant);
+  padding: common.$spacing-xs 0;
+  cursor: default;
+  line-height: 1.4;
+
+  &::before {
+    content: "•";
+    flex-shrink: 0;
+    color: var(--md-sys-color-outline);
+  }
+
+  &.active {
+    color: var(--md-sys-color-on-surface);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  elowen-span {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.collapsed-mobile {
+  @include common.flex-row-align-center;
+  justify-content: flex-end;
+}
+
+.mobile-summary-toggle {
+  display: flex;
+  border: none;
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: common.$border-radius-small;
+  padding: common.$spacing-xs;
+  cursor: pointer;
+}
+
+.has-focused-span .main-summary {
+  opacity: 1;
+}

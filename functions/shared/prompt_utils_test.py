@@ -24,19 +24,19 @@ from shared.prompt_utils import (
     get_all_spans_from_doc,
     ModelResponse,
 )
-from shared.lumi_doc import (
-    LumiDoc,
-    LumiSection,
-    LumiContent,
-    LumiSpan,
+from shared.elowen_doc import (
+    ElowenDoc,
+    ElowenSection,
+    ElowenContent,
+    ElowenSpan,
     Label,
     Heading,
     TextContent,
     ListContent,
     ListItem,
-    LumiAbstract,
-    LumiReference,
-    LumiFootnote,
+    ElowenAbstract,
+    ElowenReference,
+    ElowenFootnote,
     ImageContent,
     FigureContent,
     HtmlFigureContent,
@@ -142,8 +142,8 @@ class PromptUtilsTest(unittest.TestCase):
     def test_get_formatted_spans_list(self):
         # Test case 1: Multiple spans
         with self.subTest(name="multiple_spans"):
-            span1 = LumiSpan(id="s1", text="Hello", inner_tags=[])
-            span2 = LumiSpan(id="s2", text="World", inner_tags=[])
+            span1 = ElowenSpan(id="s1", text="Hello", inner_tags=[])
+            span2 = ElowenSpan(id="s2", text="World", inner_tags=[])
             spans = [span1, span2]
             expected_list = [
                 "{ id: s1, text: Hello}",
@@ -153,7 +153,7 @@ class PromptUtilsTest(unittest.TestCase):
 
         # Test case 2: Single span
         with self.subTest(name="single_span"):
-            span1 = LumiSpan(id="s1", text="Single", inner_tags=[])
+            span1 = ElowenSpan(id="s1", text="Single", inner_tags=[])
             spans = [span1]
             expected_list = [
                 "{ id: s1, text: Single}",
@@ -167,38 +167,38 @@ class PromptUtilsTest(unittest.TestCase):
             self.assertEqual(get_formatted_spans_list(spans), expected_list)
 
     def test_get_all_spans_from_doc(self):
-        # Setup a complex LumiDoc
-        span1 = LumiSpan(id="s1", text="This is text.", inner_tags=[])
-        span2 = LumiSpan(id="s2", text="This is a list item.", inner_tags=[])
-        span3 = LumiSpan(id="s3", text="This is a sublist item.", inner_tags=[])
-        span4 = LumiSpan(id="s4", text="Another text span.", inner_tags=[])
-        span5 = LumiSpan(id="s5", text="This is a sub-section span.", inner_tags=[])
-        span_abstract = LumiSpan(id="s_abs", text="Abstract text.", inner_tags=[])
-        span_ref = LumiSpan(id="s_ref", text="Reference text.", inner_tags=[])
-        span_foot = LumiSpan(id="s_foot", text="Footnote text.", inner_tags=[])
-        span_img_caption = LumiSpan(
+        # Setup a complex ElowenDoc
+        span1 = ElowenSpan(id="s1", text="This is text.", inner_tags=[])
+        span2 = ElowenSpan(id="s2", text="This is a list item.", inner_tags=[])
+        span3 = ElowenSpan(id="s3", text="This is a sublist item.", inner_tags=[])
+        span4 = ElowenSpan(id="s4", text="Another text span.", inner_tags=[])
+        span5 = ElowenSpan(id="s5", text="This is a sub-section span.", inner_tags=[])
+        span_abstract = ElowenSpan(id="s_abs", text="Abstract text.", inner_tags=[])
+        span_ref = ElowenSpan(id="s_ref", text="Reference text.", inner_tags=[])
+        span_foot = ElowenSpan(id="s_foot", text="Footnote text.", inner_tags=[])
+        span_img_caption = ElowenSpan(
             id="s_img_cap", text="Image caption.", inner_tags=[]
         )
-        span_fig_caption = LumiSpan(
+        span_fig_caption = ElowenSpan(
             id="s_fig_cap", text="Figure caption.", inner_tags=[]
         )
-        span_html_caption = LumiSpan(
+        span_html_caption = ElowenSpan(
             id="s_html_cap", text="HTML caption.", inner_tags=[]
         )
 
-        doc = LumiDoc(
+        doc = ElowenDoc(
             markdown="",
             concepts=[],
             sections=[
-                LumiSection(
+                ElowenSection(
                     id="sec1",
                     heading=Heading(heading_level=1, text="Section 1"),
                     contents=[
-                        LumiContent(
+                        ElowenContent(
                             id="c1",
                             text_content=TextContent(spans=[span1], tag_name="p"),
                         ),
-                        LumiContent(
+                        ElowenContent(
                             id="c2",
                             list_content=ListContent(
                                 is_ordered=False,
@@ -213,11 +213,11 @@ class PromptUtilsTest(unittest.TestCase):
                                 ],
                             ),
                         ),
-                        LumiContent(
+                        ElowenContent(
                             id="c3",
                             text_content=TextContent(spans=[span4], tag_name="p"),
                         ),
-                        LumiContent(
+                        ElowenContent(
                             id="c_img",
                             image_content=ImageContent(
                                 storage_path="",
@@ -228,13 +228,13 @@ class PromptUtilsTest(unittest.TestCase):
                                 caption=span_img_caption,
                             ),
                         ),
-                        LumiContent(
+                        ElowenContent(
                             id="c_fig",
                             figure_content=FigureContent(
                                 images=[], caption=span_fig_caption
                             ),
                         ),
-                        LumiContent(
+                        ElowenContent(
                             id="c_html",
                             html_figure_content=HtmlFigureContent(
                                 html="", caption=span_html_caption
@@ -242,11 +242,11 @@ class PromptUtilsTest(unittest.TestCase):
                         ),
                     ],
                     sub_sections=[
-                        LumiSection(
+                        ElowenSection(
                             id="subsec1",
                             heading=Heading(heading_level=2, text="Sub-section 1"),
                             contents=[
-                                LumiContent(
+                                ElowenContent(
                                     id="c4",
                                     text_content=TextContent(
                                         spans=[span5], tag_name="p"
@@ -257,16 +257,16 @@ class PromptUtilsTest(unittest.TestCase):
                     ],
                 )
             ],
-            abstract=LumiAbstract(
+            abstract=ElowenAbstract(
                 contents=[
-                    LumiContent(
+                    ElowenContent(
                         id="c_abs",
                         text_content=TextContent(spans=[span_abstract], tag_name="p"),
                     )
                 ]
             ),
-            references=[LumiReference(id="ref1", span=span_ref)],
-            footnotes=[LumiFootnote(id="fn1", span=span_foot)],
+            references=[ElowenReference(id="ref1", span=span_ref)],
+            footnotes=[ElowenFootnote(id="fn1", span=span_foot)],
         )
 
         # Test case 1: Extract all spans
@@ -291,18 +291,18 @@ class PromptUtilsTest(unittest.TestCase):
 
         # Test case 2: Empty document
         with self.subTest(name="empty_doc"):
-            empty_doc = LumiDoc(sections=[], concepts=[], markdown="")
+            empty_doc = ElowenDoc(sections=[], concepts=[], markdown="")
             self.assertEqual(get_all_spans_from_doc(empty_doc), [])
 
         # Test case 3: Document with only abstract
         with self.subTest(name="only_abstract"):
-            doc_only_abstract = LumiDoc(
+            doc_only_abstract = ElowenDoc(
                 markdown="",
                 concepts=[],
                 sections=[],
-                abstract=LumiAbstract(
+                abstract=ElowenAbstract(
                     contents=[
-                        LumiContent(
+                        ElowenContent(
                             id="c_abs",
                             text_content=TextContent(
                                 spans=[span_abstract], tag_name="p"

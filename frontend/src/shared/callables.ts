@@ -16,8 +16,8 @@
  */
 
 import { Functions, httpsCallable } from "firebase/functions";
-import { ArxivMetadata, LumiDoc } from "./lumi_doc";
-import { LumiAnswer, LumiAnswerRequest, UserFeedback } from "./api";
+import { ArxivMetadata, ElowenDoc } from "./elowen_doc";
+import { ElowenAnswer, ElowenAnswerRequest, UserFeedback } from "./api";
 import { PaperData } from "./types_local_storage";
 import { ModelConfig } from "./model_config";
 
@@ -49,25 +49,25 @@ export const requestArxivDocImportCallable = async (
 };
 
 /**
- * Requests a Lumi answer based on the document and user input.
+ * Requests a Elowen answer based on the document and user input.
  * @param functions The Firebase Functions instance.
- * @param doc The full LumiDoc object.
+ * @param doc The full ElowenDoc object.
  * @param request The user's request details.
  * @param modelConfig The user's model configuration (provider/model/key).
- * @returns A LumiAnswer object.
+ * @returns A ElowenAnswer object.
  */
-export const getLumiResponseCallable = async (
+export const getElowenResponseCallable = async (
   functions: Functions,
-  doc: LumiDoc,
-  request: LumiAnswerRequest,
+  doc: ElowenDoc,
+  request: ElowenAnswerRequest,
   modelConfig: ModelConfig
-): Promise<LumiAnswer> => {
+): Promise<ElowenAnswer> => {
   const result = await httpsCallable<
-    { doc: LumiDoc; request: LumiAnswerRequest; modelConfig: ModelConfig },
-    LumiAnswer
+    { doc: ElowenDoc; request: ElowenAnswerRequest; modelConfig: ModelConfig },
+    ElowenAnswer
   >(
     functions,
-    "get_lumi_response"
+    "get_elowen_response"
   )({ doc, request, modelConfig });
 
   return result.data;
@@ -94,20 +94,20 @@ export const getArxivMetadata = async (
 /**
  * Requests a personalized summary based on the document and user's history.
  * @param functions The Firebase Functions instance.
- * @param doc The full LumiDoc object.
+ * @param doc The full ElowenDoc object.
  * @param pastPapers The user's past papers from local history.
  * @param modelConfig The user's model configuration (provider/model/key).
  * @returns A PersonalSummary object.
  */
 export const getPersonalSummaryCallable = async (
   functions: Functions,
-  doc: LumiDoc,
+  doc: ElowenDoc,
   pastPapers: PaperData[],
   modelConfig: ModelConfig
-): Promise<LumiAnswer> => {
+): Promise<ElowenAnswer> => {
   const result = await httpsCallable<
-    { doc: LumiDoc; past_papers: PaperData[]; modelConfig: ModelConfig },
-    LumiAnswer
+    { doc: ElowenDoc; past_papers: PaperData[]; modelConfig: ModelConfig },
+    ElowenAnswer
   >(
     functions,
     "get_personal_summary"

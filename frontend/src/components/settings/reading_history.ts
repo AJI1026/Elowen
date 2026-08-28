@@ -16,21 +16,22 @@
  */
 
 import "../../pair-components/button";
-import "./tos_content";
+import "../../pair-components/dialog";
+import "../../pair-components/icon_button";
 import "../../pair-components/textinput";
 
 import { MobxLitElement } from "@adobe/lit-mobx";
 import { CSSResultGroup, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import { core } from "../../core/core";
 import { HistoryService } from "../../services/history.service";
-import { Pages, RouterService, getLumiPaperUrl } from "../../services/router.service";
+import { getElowenPaperUrl } from "../../services/router.service";
 import { SettingsService } from "../../services/settings.service";
 
-import { ArxivMetadata } from "../../shared/lumi_doc";
-import { sortPaperDataByTimestamp } from "../../shared/lumi_paper_utils";
-import { ColorMode } from "../../shared/types";
+import { ArxivMetadata } from "../../shared/elowen_doc";
+import { sortPaperDataByTimestamp } from "../../shared/elowen_paper_utils";
+import { I18nKey, t } from "../../shared/i18n";
 
 import { styles } from "./reading_history.scss";
 
@@ -40,19 +41,55 @@ export class ReadingHistory extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
   private readonly historyService = core.getService(HistoryService);
+  private readonly settingsService = core.getService(SettingsService);
 
-  @property({type: Boolean}) showTitle = false;
+  @property({ type: Boolean }) showTitle = false;
+
+  @state() private confirmOpen = false;
+  @state() private confirmTitleKey: I18nKey = "settings.removePaperTitle";
+  @state() private confirmMessageKey: I18nKey = "settings.removePaperConfirm";
+  private pendingConfirm: (() => void) | null = null;
+
+  private uiLang() {
+    return this.settingsService.responseLanguage.value;
+  }
+
+  private openConfirm(
+    titleKey: I18nKey,
+    messageKey: I18nKey,
+    onConfirm: () => void
+  ) {
+    this.confirmTitleKey = titleKey;
+    this.confirmMessageKey = messageKey;
+    this.pendingConfirm = onConfirm;
+    this.confirmOpen = true;
+  }
+
+  private closeConfirm() {
+    this.confirmOpen = false;
+    this.pendingConfirm = null;
+  }
+
+  private handleConfirm() {
+    const action = this.pendingConfirm;
+    this.closeConfirm();
+    action?.();
+    this.requestUpdate();
+  }
 
   renderHistoryItem(item: ArxivMetadata) {
+    const lang = this.uiLang();
     return html`
       <div class="history-item">
         <div class="left">
-          <a href=${getLumiPaperUrl(item.paperId)}
+          <a
+            href=${getElowenPaperUrl(item.paperId)}
             rel="noopener noreferrer"
-            class="title">
+            class="title"
+          >
             ${item.title}
           </a>
-          <div>${item.authors.join(', ')}</div>
+          <div>${item.authors.join(", ")}</div>
           <i>${item.paperId}</i>
         </div>
         <div class="right">
@@ -62,13 +99,11 @@ export class ReadingHistory extends MobxLitElement {
             variant="default"
             @click=${(e: Event) => {
               e.stopPropagation();
-              const isConfirmed = window.confirm(
-                `Are you sure you want to remove this paper from your reading history? This will also remove it from "My Collection."`
+              this.openConfirm(
+                "settings.removePaperTitle",
+                "settings.removePaperConfirm",
+                () => this.historyService.deletePaper(item.paperId)
               );
-              if (isConfirmed) {
-                this.historyService.deletePaper(item.paperId);
-                this.requestUpdate();
-              }
             }}
           >
           </pr-icon-button>
@@ -78,22 +113,47 @@ export class ReadingHistory extends MobxLitElement {
   }
 
   renderClearButton() {
+    const lang = this.uiLang();
     return html`
       <pr-button
         @click=${() => {
-          const isConfirmed = window.confirm(
-            `Are you sure you want to clear history? This will remove all items from "My Collection."`
+          this.openConfirm(
+            "settings.clearHistoryTitle",
+            "settings.clearHistoryConfirm",
+            () => this.historyService.clearAllHistory()
           );
-          if (isConfirmed) {
-            this.historyService.clearAllHistory();
-            this.requestUpdate();
-          }
         }}
         color="error"
         variant="tonal"
       >
-        Clear entire reading history
+        ${t("settings.clearHistory", lang)}
       </pr-button>
+    `;
+  }
+
+  private renderConfirmDialog() {
+    const lang = this.uiLang();
+    return html`
+      <pr-dialog
+        .showDialog=${this.confirmOpen}
+        .onClose=${() => this.closeConfirm()}
+        enableEscape
+      >
+        <div slot="title">${t(this.confirmTitleKey, lang)}</div>
+        <p class="confirm-message">${t(this.confirmMessageKey, lang)}</p>
+        <div slot="actions-right" class="confirm-actions">
+          <pr-button variant="default" @click=${() => this.closeConfirm()}>
+            ${t("common.cancel", lang)}
+          </pr-button>
+          <pr-button
+            color="error"
+            variant="tonal"
+            @click=${() => this.handleConfirm()}
+          >
+            ${t("common.confirm", lang)}
+          </pr-button>
+        </div>
+      </pr-dialog>
     `;
   }
 
@@ -101,14 +161,21 @@ export class ReadingHistory extends MobxLitElement {
     const historyItems = sortPaperDataByTimestamp(
       this.historyService.getPaperHistory()
     ).map((item) => item.metadata);
-  const hasItems = historyItems.length > 0;
+    const hasItems = historyItems.length > 0;
+    const lang = this.uiLang();
 
     return html`
-      ${this.showTitle ?
-        html`<h2>Reading History (${historyItems.length})</h2>` : nothing}
-      ${!hasItems ? html`<i>No papers yet</i>` : nothing}
+      ${this.showTitle
+        ? html`<h2>
+            ${t("settings.historyTitle", lang, {
+              count: historyItems.length,
+            })}
+          </h2>`
+        : nothing}
+      ${!hasItems ? html`<i>${t("settings.historyEmpty", lang)}</i>` : nothing}
       ${historyItems.map((item) => this.renderHistoryItem(item))}
       ${hasItems ? this.renderClearButton() : nothing}
+      ${this.renderConfirmDialog()}
     `;
   }
 }

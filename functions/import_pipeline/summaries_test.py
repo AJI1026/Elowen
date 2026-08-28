@@ -20,8 +20,8 @@ import json
 from typing import List
 
 from import_pipeline.summaries import (
-    generate_lumi_summaries,
-    FetchLumiSummariesRequestOptions,
+    generate_elowen_summaries,
+    FetchElowenSummariesRequestOptions,
     _get_all_spans_from_doc,
     _get_text_from_content,
     _get_text_from_section,
@@ -33,8 +33,9 @@ from import_pipeline.summaries import (
     _get_all_contents_with_text,
     AbstractExcerptSchema,
     LabelSchema,
+    ContentLabelSchema,
 )
-from shared.lumi_doc import LumiDoc, LumiSpan, LumiSummaries, LumiSummary, LumiSection, LumiContent, Heading, TextContent, ListContent, ListItem, LumiAbstract, InnerTagName, Position
+from shared.elowen_doc import ElowenDoc, ElowenSpan, ElowenSummaries, ElowenSummary, ElowenSection, ElowenContent, Heading, TextContent, ListContent, ListItem, ElowenAbstract, InnerTagName, Position
 
 
 class SummariesTest(unittest.TestCase):
@@ -50,30 +51,30 @@ class SummariesTest(unittest.TestCase):
         abstract_text_2 = "This is the most important sentence of the abstract, containing the key finding."
         abstract_text_3 = "This is the final sentence of the abstract."
 
-        self.mock_text_content1 = LumiContent(id="tc1", text_content=TextContent(tag_name="p", spans=[LumiSpan(id="s1a", text=content_text_1, inner_tags=[])]))
-        self.mock_text_content2 = LumiContent(id="tc2", text_content=TextContent(tag_name="p", spans=[LumiSpan(id="s2a", text=content_text_2, inner_tags=[])]))
+        self.mock_text_content1 = ElowenContent(id="tc1", text_content=TextContent(tag_name="p", spans=[ElowenSpan(id="s1a", text=content_text_1, inner_tags=[])]))
+        self.mock_text_content2 = ElowenContent(id="tc2", text_content=TextContent(tag_name="p", spans=[ElowenSpan(id="s2a", text=content_text_2, inner_tags=[])]))
 
-        self.mock_list_item1 = ListItem(spans=[LumiSpan(id="s3a", text=list_item_text_1, inner_tags=[])])
-        self.mock_list_content1 = LumiContent(id="lc1", list_content=ListContent(is_ordered=False, list_items=[self.mock_list_item1]))
-        self.mock_list_item2 = ListItem(spans=[LumiSpan(id="s3b", text=list_item_text_2, inner_tags=[])])
-        self.mock_list_content2 = LumiContent(id="lc2", list_content=ListContent(is_ordered=False, list_items=[self.mock_list_item2]))
+        self.mock_list_item1 = ListItem(spans=[ElowenSpan(id="s3a", text=list_item_text_1, inner_tags=[])])
+        self.mock_list_content1 = ElowenContent(id="lc1", list_content=ListContent(is_ordered=False, list_items=[self.mock_list_item1]))
+        self.mock_list_item2 = ListItem(spans=[ElowenSpan(id="s3b", text=list_item_text_2, inner_tags=[])])
+        self.mock_list_content2 = ElowenContent(id="lc2", list_content=ListContent(is_ordered=False, list_items=[self.mock_list_item2]))
 
-        self.mock_abstract_content = LumiContent(
+        self.mock_abstract_content = ElowenContent(
             id="ac1",
             text_content=TextContent(
                 tag_name="p",
                 spans=[
-                    LumiSpan(id="abs1", text=abstract_text_1, inner_tags=[]),
-                    LumiSpan(id="abs2", text=abstract_text_2, inner_tags=[]),
-                    LumiSpan(id="abs3", text=abstract_text_3, inner_tags=[]),
+                    ElowenSpan(id="abs1", text=abstract_text_1, inner_tags=[]),
+                    ElowenSpan(id="abs2", text=abstract_text_2, inner_tags=[]),
+                    ElowenSpan(id="abs3", text=abstract_text_3, inner_tags=[]),
                 ],
             ),
         )
-        self.mock_abstract = LumiAbstract(contents=[self.mock_abstract_content])
+        self.mock_abstract = ElowenAbstract(contents=[self.mock_abstract_content])
 
-        self.mock_section1 = LumiSection(id="sec1", heading=Heading(heading_level=2, text="Section One"), contents=[self.mock_text_content1])
-        self.mock_section2 = LumiSection(id="sec2", heading=Heading(heading_level=2, text="Section Two"), contents=[self.mock_text_content2, self.mock_list_content2])
-        self.mock_document = LumiDoc(
+        self.mock_section1 = ElowenSection(id="sec1", heading=Heading(heading_level=2, text="Section One"), contents=[self.mock_text_content1])
+        self.mock_section2 = ElowenSection(id="sec2", heading=Heading(heading_level=2, text="Section Two"), contents=[self.mock_text_content2, self.mock_list_content2])
+        self.mock_document = ElowenDoc(
             markdown="Mock document content",
             sections=[self.mock_section1, self.mock_section2],
             concepts=[], abstract=self.mock_abstract, references=None, summaries=None, metadata=None, loading_status=None
@@ -86,7 +87,7 @@ class SummariesTest(unittest.TestCase):
 
     @patch('import_pipeline.summaries.get_unique_id', return_value='unique_span_id')
     @patch('import_pipeline.summaries.gemini.call_predict_with_schema')
-    def test_generate_lumi_summaries(self, mock_call_predict_with_schema, mock_get_unique_id):
+    def test_generate_elowen_summaries(self, mock_call_predict_with_schema, mock_get_unique_id):
         with self.subTest(name="include_section_summaries"):
             self._reset_mocks(mock_call_predict_with_schema, mock_get_unique_id)
             # Mock return values for gemini.call_predict_with_schema
@@ -99,8 +100,8 @@ class SummariesTest(unittest.TestCase):
             section_data = _get_all_sections_with_text(self.mock_document)
             expected_prompt = _generate_section_summaries_prompt(section_data)
 
-            options = FetchLumiSummariesRequestOptions(include_section_summaries=True)
-            summaries = generate_lumi_summaries(self.mock_document, options)
+            options = FetchElowenSummariesRequestOptions(include_section_summaries=True)
+            summaries = generate_elowen_summaries(self.mock_document, options)
 
             self.assertEqual(len(summaries.section_summaries), 3)
             self.assertEqual(summaries.section_summaries[0].id, "sec1")
@@ -128,17 +129,25 @@ class SummariesTest(unittest.TestCase):
             self._reset_mocks(mock_call_predict_with_schema, mock_get_unique_id)
             # Mock return values for gemini.call_predict_with_schema
             mock_call_predict_with_schema.return_value = [
-                LabelSchema(id="tc1", label="Summary for Text Content 1"),
-                LabelSchema(id="tc2", label="Summary for <b>Text Content 2</b>"),
-                LabelSchema(id="lc2", label="Summary for List Content 2")
+                ContentLabelSchema(
+                    id="tc1", gist="Summary for Text Content 1", purpose="引入背景"
+                ),
+                ContentLabelSchema(
+                    id="tc2",
+                    gist="Summary for <b>Text Content 2</b>",
+                    purpose="说明方法",
+                ),
+                ContentLabelSchema(
+                    id="lc2", gist="Summary for List Content 2", purpose="总结要点"
+                ),
             ]
 
             # Manually construct the expected prompt for content summaries
             content_data = _get_all_contents_with_text(self.mock_document)
             expected_prompt = _get_generate_content_summaries_prompt(content_data)
 
-            options = FetchLumiSummariesRequestOptions(include_content_summaries=True)
-            summaries = generate_lumi_summaries(self.mock_document, options)
+            options = FetchElowenSummariesRequestOptions(include_content_summaries=True)
+            summaries = generate_elowen_summaries(self.mock_document, options)
 
             self.assertEqual(len(summaries.content_summaries), 3)
             self.assertEqual(summaries.content_summaries[0].id, "tc1")
@@ -146,7 +155,9 @@ class SummariesTest(unittest.TestCase):
             self.assertEqual(summaries.content_summaries[1].summary.text, "Summary for Text Content 2")
             self.assertEqual(len(summaries.content_summaries[1].summary.inner_tags), 1)
             self.assertEqual(summaries.content_summaries[2].id, "lc2")
-            mock_call_predict_with_schema.assert_called_once_with(expected_prompt, response_schema=list[LabelSchema])
+            mock_call_predict_with_schema.assert_called_once_with(
+                expected_prompt, response_schema=list[ContentLabelSchema]
+            )
             self.assertIsNone(summaries.abstract_excerpt_span_id)
 
         with self.subTest(name="include_span_summaries"):
@@ -162,8 +173,8 @@ class SummariesTest(unittest.TestCase):
             spans = _get_all_spans_from_doc(self.mock_document)
             expected_prompt = _generate_span_summaries_prompt(spans)
 
-            options = FetchLumiSummariesRequestOptions(include_span_summaries=True)
-            summaries = generate_lumi_summaries(self.mock_document, options)
+            options = FetchElowenSummariesRequestOptions(include_span_summaries=True)
+            summaries = generate_elowen_summaries(self.mock_document, options)
 
             self.assertEqual(len(summaries.span_summaries), 3)
             self.assertEqual(summaries.span_summaries[0].id, "s1a")
@@ -179,8 +190,8 @@ class SummariesTest(unittest.TestCase):
         with self.subTest(name="no_summaries_included"):
             self._reset_mocks(mock_call_predict_with_schema, mock_get_unique_id)
 
-            options = FetchLumiSummariesRequestOptions() # All false
-            summaries = generate_lumi_summaries(self.mock_document, options)
+            options = FetchElowenSummariesRequestOptions() # All false
+            summaries = generate_elowen_summaries(self.mock_document, options)
             self.assertEqual(len(summaries.section_summaries), 0)
             self.assertEqual(len(summaries.content_summaries), 0)
             self.assertEqual(len(summaries.span_summaries), 0)
@@ -188,7 +199,7 @@ class SummariesTest(unittest.TestCase):
             self.assertIsNone(summaries.abstract_excerpt_span_id)
 
     @patch('import_pipeline.summaries.gemini.call_predict_with_schema')
-    def test_generate_lumi_summaries_with_abstract_excerpt(self, mock_call_predict_with_schema):
+    def test_generate_elowen_summaries_with_abstract_excerpt(self, mock_call_predict_with_schema):
         self._reset_mocks(mock_call_predict_with_schema)
         # Mock the response for the abstract excerpt selection
         expected_span_id = "abs2"
@@ -202,8 +213,8 @@ class SummariesTest(unittest.TestCase):
         expected_prompt = _select_abstract_excerpt_prompt(abstract_spans)
 
         # Call the main function with abstract excerpt option enabled
-        options = FetchLumiSummariesRequestOptions(include_abstract_excerpt=True)
-        summaries = generate_lumi_summaries(self.mock_document, options)
+        options = FetchElowenSummariesRequestOptions(include_abstract_excerpt=True)
+        summaries = generate_elowen_summaries(self.mock_document, options)
 
         # Assert that the correct span ID was populated
         self.assertEqual(summaries.abstract_excerpt_span_id, expected_span_id)

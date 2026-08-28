@@ -15,12 +15,12 @@
 
 from dataclasses import dataclass, field
 from typing import List, Optional
-from shared.api import LumiAnswer
-from shared.lumi_doc import ArxivMetadata
+from shared.api import ElowenAnswer
+from shared.elowen_doc import ArxivMetadata
 
 
 @dataclass
 class PaperData:
     metadata: ArxivMetadata
-    history: List[LumiAnswer] = field(default_factory=list)
-    personal_summary: Optional[LumiAnswer] = None
+    history: List[ElowenAnswer] = field(default_factory=list)
+    personal_summary: Optional[ElowenAnswer] = None

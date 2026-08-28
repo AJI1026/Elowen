@@ -15,10 +15,14 @@
  * limitations under the License.
  */
 
-import { LitElement, html, CSSResultGroup } from "lit";
+import { MobxLitElement } from "@adobe/lit-mobx";
+import { html, CSSResultGroup } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { core } from "../../core/core";
 import { getArxivPaperUrl } from "../../services/router.service";
-import { ArxivMetadata } from "../../shared/lumi_doc";
+import { SettingsService } from "../../services/settings.service";
+import { ArxivMetadata } from "../../shared/elowen_doc";
+import { t } from "../../shared/i18n";
 import { styles } from "./loading_document.scss";
 
 import "../../pair-components/circular_progress";
@@ -29,16 +33,24 @@ import "../../pair-components/icon_button";
  * A component to display document metadata while the full document is loading.
  */
 @customElement("loading-document")
-export class LoadingDocument extends LitElement {
+export class LoadingDocument extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
+
+  private readonly settingsService = core.getService(SettingsService);
 
   @property({ type: Object }) metadata?: ArxivMetadata;
   @property({ type: Object }) onBackClick: () => void = () => {};
+
+  private uiLang() {
+    return this.settingsService.responseLanguage.value;
+  }
 
   override render() {
     if (!this.metadata) {
       return html``;
     }
+
+    const lang = this.uiLang();
 
     return html`
       <div class="loading-container">
@@ -46,12 +58,9 @@ export class LoadingDocument extends LitElement {
           <div class="header">
             <div class="importing-group">
               <pr-circular-progress></pr-circular-progress>
-              <span>Importing document...</span>
+              <span>${t("loading.importing", lang)}</span>
             </div>
-            <span class="note-text">
-              This may take a few minutes. Feel free to browse other papers and
-              come back to this link.
-            </span>
+            <span class="note-text"> ${t("loading.importHint", lang)} </span>
           </div>
           <div class="metadata-content">
             <h1 class="title">
@@ -60,13 +69,14 @@ export class LoadingDocument extends LitElement {
                 <a
                   href=${getArxivPaperUrl(this.metadata.paperId)}
                   class="arxiv-link"
+                  target="_blank"
                   rel="noopener noreferrer"
                 >
                   <pr-icon-button
                     class="open-button"
                     variant="default"
                     icon="open_in_new"
-                    title="Open in arXiv"
+                    title=${t("arxiv.open", lang)}
                   >
                   </pr-icon-button>
                 </a>
@@ -77,7 +87,7 @@ export class LoadingDocument extends LitElement {
           </div>
           <div class="footer">
             <pr-button variant="tonal" @click=${this.onBackClick.bind(this)}
-              >Back to Lumi home</pr-button
+              >${t("nav.backHome", lang)}</pr-button
             >
           </div>
         </div>

@@ -33,6 +33,7 @@ import {
   OverflowMenuProps,
   ReferenceTooltipProps,
   SmartHighlightMenuProps,
+  UserAnnotationTooltipProps,
 } from "../../services/floating_panel_service";
 
 import type { MdMenu } from "@material/web/menu/menu.js";
@@ -44,6 +45,7 @@ import "../footnote_tooltip/footnote_tooltip";
 import "../info_tooltip/info_tooltip";
 import "../overflow_menu/overflow_menu";
 import "../reference_tooltip/reference_tooltip";
+import "../user_annotation_tooltip/user_annotation_tooltip";
 import { classMap } from "lit/directives/class-map.js";
 
 /**
@@ -139,6 +141,14 @@ export class FloatingPanelHost extends MobxLitElement {
         <answer-highlight-tooltip
           .props=${contentProps}
         ></answer-highlight-tooltip>
+      `;
+    }
+
+    if (contentProps instanceof UserAnnotationTooltipProps) {
+      return html`
+        <user-annotation-tooltip
+          .props=${contentProps}
+        ></user-annotation-tooltip>
       `;
     }
 

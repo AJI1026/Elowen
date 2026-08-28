@@ -15,56 +15,58 @@
 import time
 from typing import List
 from models import gemini, prompts
-from shared.lumi_doc import LumiDoc, LumiSpan, LumiContent, TextContent
+from shared.elowen_doc import ElowenDoc, ElowenSpan, ElowenContent, TextContent
 from shared.types_local_storage import PaperData
-from import_pipeline import convert_html_to_lumi, markdown_utils
-from shared.api import LumiAnswer, LumiAnswerRequest
+from shared import prompt_utils
+from import_pipeline import convert_html_to_elowen, markdown_utils
+from shared.api import ElowenAnswer, ElowenAnswerRequest
 from shared.utils import get_unique_id
 from shared.constants import PERSONAL_SUMMARY_QUERY_NAME
 
 
-def get_personal_summary(doc: LumiDoc, past_papers: List[PaperData], api_key:str|None, model_config:dict|None = None) -> LumiAnswer:
+def get_personal_summary(doc: ElowenDoc, past_papers: List[PaperData], api_key:str|None, model_config:dict|None = None) -> ElowenAnswer:
     """
     Generates a personalized summary for a document.
 
     Args:
-        doc (LumiDoc): The document to summarize.
+        doc (ElowenDoc): The document to summarize.
         past_papers (List[PaperData]): A list of past papers for context.
         api_key (str|None): API key override (backward compatible).
         model_config (dict|None): Per-request provider/model/base_url overrides.
 
     Returns:
-        LumiAnswer: The generated personalized summary, packaged as a LumiAnswer.
+        ElowenAnswer: The generated personalized summary, packaged as a ElowenAnswer.
     """
     prompt = prompts.make_personal_summary_prompt(doc, past_papers)
+    prompt += prompt_utils.get_response_language_instruction(model_config)
     markdown_response = gemini.call_predict(
         prompt, api_key=api_key, model_config=model_config
     )
     html_response = markdown_utils.markdown_to_html(markdown_response)
 
-    # Parse the markdown response to create LumiContent objects.
-    response_sections = convert_html_to_lumi.convert_to_lumi_sections(
+    # Parse the markdown response to create ElowenContent objects.
+    response_sections = convert_html_to_elowen.convert_to_elowen_sections(
         html_response, placeholder_map={}, strip_double_brackets=True
     )
 
-    response_content: List[LumiContent] = []
+    response_content: List[ElowenContent] = []
     for section in response_sections:
         response_content.extend(section.contents)
 
     # If parsing fails or returns no content, create a single raw span as a fallback.
     if not response_content:
-        fallback_span = LumiSpan(
+        fallback_span = ElowenSpan(
             id=get_unique_id(), text=markdown_response, inner_tags=[]
         )
         fallback_text_content = TextContent(tag_name="p", spans=[fallback_span])
-        fallback_content = LumiContent(
+        fallback_content = ElowenContent(
             id=get_unique_id(), text_content=fallback_text_content
         )
         response_content = [fallback_content]
 
-    request = LumiAnswerRequest(query=PERSONAL_SUMMARY_QUERY_NAME)
+    request = ElowenAnswerRequest(query=PERSONAL_SUMMARY_QUERY_NAME)
 
-    return LumiAnswer(
+    return ElowenAnswer(
         id=get_unique_id(),
         request=request,
         response_content=response_content,

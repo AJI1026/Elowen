@@ -18,8 +18,9 @@
 import { action, makeObservable, observable } from "mobx";
 import { Service } from "./service";
 import { HighlightSelection } from "../shared/selection_utils";
-import { LumiConcept, LumiFootnote, LumiReference } from "../shared/lumi_doc";
-import { ImageInfo, LumiAnswer } from "../shared/api";
+import { ElowenConcept, ElowenFootnote, ElowenReference } from "../shared/elowen_doc";
+import { ImageInfo, ElowenAnswer } from "../shared/api";
+import { UserAnnotation } from "../shared/types_local_storage";
 
 /** Defines the allowed values for menu and anchor corners. */
 export type Corner = "start-start" | "start-end" | "end-start" | "end-end";
@@ -49,7 +50,21 @@ export class SmartHighlightMenuProps extends FloatingPanelContentProps {
       highlightedSpans: HighlightSelection[],
       imageInfo?: ImageInfo
     ) => void,
-    public imageInfo?: ImageInfo
+    public onHighlight?: (
+      text: string,
+      highlightedSpans: HighlightSelection[]
+    ) => void,
+    public onAddNote?: (
+      text: string,
+      note: string,
+      highlightedSpans: HighlightSelection[]
+    ) => void,
+    public imageInfo?: ImageInfo,
+    public onMindmap?: (
+      text: string,
+      highlightedSpans: HighlightSelection[],
+      imageInfo?: ImageInfo
+    ) => void
   ) {
     super();
   }
@@ -57,28 +72,44 @@ export class SmartHighlightMenuProps extends FloatingPanelContentProps {
 
 /** Props for the ReferenceTooltip component. */
 export class ReferenceTooltipProps extends FloatingPanelContentProps {
-  constructor(public reference: LumiReference) {
+  constructor(public reference: ElowenReference) {
     super();
   }
 }
 
 /** Props for the ConceptTooltip component. */
 export class ConceptTooltipProps extends FloatingPanelContentProps {
-  constructor(public concept: LumiConcept) {
+  constructor(
+    public concept: ElowenConcept,
+    public spanId?: string
+  ) {
     super();
   }
 }
 
 /** Props for the FootnoteTooltip component. */
 export class FootnoteTooltipProps extends FloatingPanelContentProps {
-  constructor(public footnote: LumiFootnote) {
+  constructor(public footnote: ElowenFootnote) {
     super();
   }
 }
 
 /** Props for the AnswerHighlightTooltip component. */
 export class AnswerHighlightTooltipProps extends FloatingPanelContentProps {
-  constructor(public answer: LumiAnswer) {
+  constructor(public answer: ElowenAnswer) {
+    super();
+  }
+}
+
+/** Props for the UserAnnotationTooltip component. */
+export class UserAnnotationTooltipProps extends FloatingPanelContentProps {
+  constructor(
+    public annotation: UserAnnotation,
+    public docId: string,
+    public onUpdate: (annotation: UserAnnotation) => void,
+    public onDelete: (annotationId: string) => void,
+    public onGoTo: (annotation: UserAnnotation) => void
+  ) {
     super();
   }
 }

@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     print("Prompt for answers...")
     print(
-        prompts.LUMI_PROMPT_DEFINE.format(
+        prompts.ELOWEN_PROMPT_DEFINE.format(
             spans_string="spans", highlight="highlight", history_string="history"
         )
     )

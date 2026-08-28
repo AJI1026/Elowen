@@ -1,6 +1,6 @@
-# Lumi Firebase Cloud Functions
+# Elowen Firebase Cloud Functions
 
-Defines cloud functions for Lumi backend.
+Defines cloud functions for Elowen backend.
 
 ## Set-up
 
@@ -23,10 +23,32 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Create an api_config.py file and add your API key (see TODOs in example file).
+4. Configure the **server-side** model and API key.
+
+This is used by backend import / formatting (not the Key you enter in the
+frontend Settings page, which is stored in the browser for in-paper Ask).
 
 ```
 cp models/api_config.example.py models/api_config.py
+```
+
+`models/api_config.py` is gitignored. Edit it and/or set environment
+variables before starting the emulator:
+
+| Setting | In `api_config.py` | Environment override |
+| --- | --- | --- |
+| Provider (`gemini` / `deepseek` / `openai`) | `MODEL_PROVIDER` | `ELOWEN_MODEL_PROVIDER` |
+| Default model | `MODEL_NAME` | `ELOWEN_MODEL_NAME` |
+| Strong model (import / PDF) | `MODEL_NAME_STRONG` | `ELOWEN_MODEL_NAME_STRONG` |
+| API key | `DEFAULT_API_KEY` | `ELOWEN_API_KEY` |
+| OpenAI-compatible base URL | `BASE_URL` | `ELOWEN_BASE_URL` |
+
+Example (DeepSeek via env, then start emulators):
+
+```bash
+export ELOWEN_MODEL_PROVIDER=deepseek
+export ELOWEN_API_KEY=sk-...
+firebase emulators:start
 ```
 
 ## Running locally

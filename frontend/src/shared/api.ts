@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { LumiContent } from "./lumi_doc";
+import { ElowenContent } from "./elowen_doc";
 import { HighlightSelection } from "./selection_utils";
 
 // Kept in sync with: functions/shared/api.py
@@ -24,18 +24,22 @@ export interface ImageInfo {
 }
 
 // Kept in sync with: functions/shared/api.py
-export interface LumiAnswerRequest {
+export type ElowenAnswerResponseMode = "mindmap";
+
+export interface ElowenAnswerRequest {
   query?: string;
   highlight?: string;
   highlightedSpans?: HighlightSelection[];
   image?: ImageInfo;
+  /** "mindmap" requests a nested logic map instead of short prose. */
+  responseMode?: ElowenAnswerResponseMode;
 }
 
 // Kept in sync with: functions/shared/api.py
-export interface LumiAnswer {
+export interface ElowenAnswer {
   id: string;
-  request: LumiAnswerRequest;
-  responseContent: LumiContent[];
+  request: ElowenAnswerRequest;
+  responseContent: ElowenContent[];
   timestamp: number;
   isLoading?: boolean;
 }

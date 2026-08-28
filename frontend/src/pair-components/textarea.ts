@@ -26,6 +26,10 @@ import { getComponentClassName } from "./utils";
 
 import { styles } from "./textarea.scss";
 import { ifDefined } from "lit/directives/if-defined.js";
+import {
+  looksLikeFragmentedClipboardText,
+  normalizeSelectionText,
+} from "../shared/selection_utils";
 
 function fitTextAreaToContent(
   textarea: HTMLElement,
@@ -124,6 +128,32 @@ export class TextArea extends LitElement {
     }
   }
 
+  onPaste(e: ClipboardEvent) {
+    const raw = e.clipboardData?.getData("text/plain") ?? "";
+    if (!looksLikeFragmentedClipboardText(raw)) {
+      return;
+    }
+
+    e.preventDefault();
+    const normalized = normalizeSelectionText(raw);
+    const textarea = e.target as HTMLTextAreaElement;
+    const start = textarea.selectionStart ?? this.value.length;
+    const end = textarea.selectionEnd ?? this.value.length;
+    const next =
+      this.value.slice(0, start) + normalized + this.value.slice(end);
+    this.value = this.maxLength ? next.slice(0, this.maxLength) : next;
+    this.dispatchEvent(
+      new CustomEvent("change", { detail: { value: this.value } })
+    );
+
+    const cursor = start + normalized.length;
+    requestAnimationFrame(() => {
+      textarea.selectionStart = cursor;
+      textarea.selectionEnd = cursor;
+      fitTextAreaToContent(textarea, this.maxViewportHeight);
+    });
+  }
+
   onKeydown(e: KeyboardEvent) {
     const event = { detail: { key: e.key } };
     this.dispatchEvent(new CustomEvent("keydown", event));
@@ -156,6 +186,7 @@ export class TextArea extends LitElement {
           placeholder=${this.placeholder}
           .value=${this.value}
           @input=${this.onChange}
+          @paste=${this.onPaste}
           @keydown=${this.onKeydown}
         ></textarea>
       </div>

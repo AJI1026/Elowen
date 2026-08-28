@@ -18,7 +18,7 @@
 import "../../pair-components/textarea";
 import "../../pair-components/icon";
 import "../../pair-components/icon_button";
-import "../lumi_image/lumi_image";
+import "../elowen_image/elowen_image";
 
 import { MobxLitElement } from "@adobe/lit-mobx";
 import { CSSResultGroup, html, nothing, PropertyValues } from "lit";
@@ -32,19 +32,19 @@ import { HistoryService } from "../../services/history.service";
 import {
   Pages,
   RouterService,
-  getLumiPaperUrl,
+  getElowenPaperUrl,
 } from "../../services/router.service";
 import { FirebaseService } from "../../services/firebase.service";
 import { SnackbarService } from "../../services/snackbar.service";
 
 import {
-  LumiDoc,
+  ElowenDoc,
   LoadingStatus,
   ArxivMetadata,
   LOADING_STATUS_ERROR_STATES,
   FeaturedImage,
-} from "../../shared/lumi_doc";
-import { ArxivCollection } from "../../shared/lumi_collection";
+} from "../../shared/elowen_doc";
+import { ArxivCollection } from "../../shared/elowen_collection";
 import {
   requestArxivDocImportCallable,
   RequestArxivDocImportResult,
@@ -59,13 +59,15 @@ import { GalleryView } from "../../shared/types";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { DialogService, TOSDialogProps } from "../../services/dialog.service";
 import { SettingsService } from "../../services/settings.service";
+import { t } from "../../shared/i18n";
+import { ResponseLanguage } from "../../shared/model_config";
 
-function getStatusDisplayText(status: LoadingStatus) {
+function getStatusDisplayText(status: LoadingStatus, lang: ResponseLanguage) {
   switch (status) {
     case LoadingStatus.WAITING:
-      return "Loading";
+      return t("home.statusLoading", lang);
     case LoadingStatus.SUMMARIZING:
-      return "Summarizing";
+      return t("home.statusSummarizing", lang);
     default:
       return "";
   }
@@ -146,7 +148,12 @@ export class HomeGallery extends MobxLitElement {
     const paperId = extractArxivId(this.paperInput);
     if (!paperId) {
       // Paper ID is only empty if input was empty or invalid
-      this.snackbarService.show(`Error: Invalid arXiv URL or ID`);
+      this.snackbarService.show(
+        t(
+          "home.snackInvalidArxiv",
+          this.settingsService.responseLanguage.value
+        )
+      );
       return;
     }
 
@@ -158,20 +165,30 @@ export class HomeGallery extends MobxLitElement {
       (paper) => paper.metadata.paperId === paperId
     );
     if (foundPaper && foundPaper.status === "complete") {
-      this.snackbarService.show("Paper already loaded.");
+      this.snackbarService.show(
+        t("home.snackAlreadyLoaded", this.settingsService.responseLanguage.value)
+      );
     }
 
     try {
       response = await this.requestDocument(paperId);
     } catch (error) {
-      this.snackbarService.show(`Error: ${(error as Error).message}`);
+      this.snackbarService.show(
+        t("home.snackError", this.settingsService.responseLanguage.value, {
+          message: (error as Error).message,
+        })
+      );
       return;
     } finally {
       this.isLoadingMetadata = false;
     }
 
     if (response.error) {
-      this.snackbarService.show(`Error: ${response.error}`);
+      this.snackbarService.show(
+        t("home.snackError", this.settingsService.responseLanguage.value, {
+          message: response.error,
+        })
+      );
       return;
     }
 
@@ -180,7 +197,9 @@ export class HomeGallery extends MobxLitElement {
 
     const metadata = response.metadata;
     if (!metadata || !metadata.version) {
-      this.snackbarService.show("Error: Document not found.");
+      this.snackbarService.show(
+        t("home.snackNotFound", this.settingsService.responseLanguage.value)
+      );
       return;
     }
 
@@ -201,7 +220,7 @@ export class HomeGallery extends MobxLitElement {
       doc(this.firebaseService.firestore, docPath),
       (snapshot) => {
         if (snapshot.exists()) {
-          const data = snapshot.data() as LumiDoc;
+          const data = snapshot.data() as ElowenDoc;
 
           if (data.metadata) {
             this.loadingStatusMap.set(
@@ -219,7 +238,9 @@ export class HomeGallery extends MobxLitElement {
 
             this.unsubscribeListeners.get(paperId)?.();
             this.unsubscribeListeners.delete(paperId);
-            this.snackbarService.show("Document loaded.");
+            this.snackbarService.show(
+              t("home.snackLoaded", this.settingsService.responseLanguage.value)
+            );
           } else if (
             LOADING_STATUS_ERROR_STATES.includes(
               data.loadingStatus as LoadingStatus
@@ -285,6 +306,8 @@ export class HomeGallery extends MobxLitElement {
       close();
     };
 
+    const lang = this.settingsService.responseLanguage.value;
+
     return html`
       <pr-dialog
         .showDialog=${this.homeService.showUploadDialog}
@@ -292,7 +315,7 @@ export class HomeGallery extends MobxLitElement {
         showCloseButton
         enableEscape
       >
-        <div slot="title">Import paper</div>
+        <div slot="title">${t("home.importTitle", lang)}</div>
         <div class="dialog-content">
           <div class="paper-input">
             <pr-textarea
@@ -309,7 +332,7 @@ export class HomeGallery extends MobxLitElement {
                   submit();
                 }
               }}
-              placeholder="Paste your arXiv paper link here"
+              placeholder=${t("home.importPlaceholder", lang)}
             ></pr-textarea>
             <pr-icon-button
               icon="arrow_forward"
@@ -326,13 +349,14 @@ export class HomeGallery extends MobxLitElement {
   }
 
   private renderLoadingMessages(metadata: ArxivMetadata[]) {
+    const lang = this.settingsService.responseLanguage.value;
     const loadingItems = metadata.filter((item) =>
       this.unsubscribeListeners.get(item.paperId)
     );
 
     const renderNewLoading = () => {
       return html`
-        <div class="loading-message"><i>Loading new paper...</i></div>
+        <div class="loading-message"><i>${t("home.loadingNew", lang)}</i></div>
       `;
     };
 
@@ -343,7 +367,10 @@ export class HomeGallery extends MobxLitElement {
           ${loadingItems.map(
             (item) => html`
               <div class="loading-message">
-                Loading <i>${item.title} (${item.paperId})</i>
+                ${t("home.loadingNamed", lang, {
+                  title: item.title,
+                  id: item.paperId,
+                })}
               </div>
             `
           )}
@@ -380,7 +407,7 @@ export class HomeGallery extends MobxLitElement {
     return html`
       <div class=${classes} role="button" @click=${navigate}>
         <pr-icon icon="bookmarks" size="small"></pr-icon>
-        <span>My collection</span>
+        <span>${t("home.myCollection", this.settingsService.responseLanguage.value)}</span>
       </div>
     `;
   }
@@ -420,14 +447,15 @@ export class HomeGallery extends MobxLitElement {
         metadata.paperId
       );
       const status = this.loadingStatusMap.get(metadata.paperId);
+      const lang = this.settingsService.responseLanguage.value;
       return html`
         <a
-          href=${getLumiPaperUrl(metadata.paperId)}
+          href=${getElowenPaperUrl(metadata.paperId)}
           class="paper-card-link"
           rel="noopener noreferrer"
         >
           <paper-card
-            .status=${status ? getStatusDisplayText(status) : ""}
+            .status=${status ? getStatusDisplayText(status, lang) : ""}
             .metadata=${metadata}
             .image=${ifDefined(image)}
             .getImageUrl=${this.getImageUrl()}
@@ -437,7 +465,10 @@ export class HomeGallery extends MobxLitElement {
       `;
     };
     const renderEmpty = () => {
-      return html` <div class="empty-message">No papers available</div> `;
+      return html` <div class="empty-message">${t(
+        "home.empty",
+        this.settingsService.responseLanguage.value
+      )}</div> `;
     };
 
     return html`
@@ -469,11 +500,11 @@ export class PaperCard extends MobxLitElement {
     ) {
       return html`<div class="preview-image preview-image-gradient"></div>`;
     }
-    return html`<lumi-image
+    return html`<elowen-image
       class="preview-image"
       .storagePath=${this.image.imageStoragePath}
       .getImageUrl=${this.getImageUrl}
-    ></lumi-image>`;
+    ></elowen-image>`;
   }
 
   override render() {

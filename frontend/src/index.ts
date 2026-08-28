@@ -28,6 +28,6 @@ async function main() {
   const initializationService = core.getService(InitializationService);
   await initializationService.initialize();
 
-  render(html`<lumi-app></lumi-app>`, document.body);
+  render(html`<elowen-app></elowen-app>`, document.body);
 }
 main();

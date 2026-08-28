@@ -15,15 +15,15 @@
  * limitations under the License.
  */
 
-import { LumiAnswer, LumiAnswerRequest } from "./api";
+import { ElowenAnswer, ElowenAnswerRequest } from "./api";
 
 /**
- * Creates a temporary LumiAnswer object to be used as a placeholder
+ * Creates a temporary ElowenAnswer object to be used as a placeholder
  * while waiting for a real response from the backend.
  * @param request The original request for the answer.
- * @returns A temporary LumiAnswer object.
+ * @returns A temporary ElowenAnswer object.
  */
-export function createTemporaryAnswer(request: LumiAnswerRequest): LumiAnswer {
+export function createTemporaryAnswer(request: ElowenAnswerRequest): ElowenAnswer {
   return {
     id: `temp-${Date.now()}`,
     request,

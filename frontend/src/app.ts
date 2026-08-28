@@ -19,7 +19,7 @@ import "./pair-components/button";
 import "./components/gallery/home_gallery";
 import "./components/header/header";
 import "./components/settings/settings";
-import "./components/lumi_reader/lumi_reader";
+import "./components/elowen_reader/elowen_reader";
 import "./components/floating_panel_host/floating_panel_host";
 import "./components/smart_highlight_menu/smart_highlight_menu";
 import "./components/dialogs/dialogs";
@@ -43,9 +43,10 @@ import { styles } from "./app.scss";
 import { LightMobxLitElement } from "./components/light_mobx_lit_element/light_mobx_lit_element";
 
 import { GalleryView } from "./shared/types";
+import { applyDocumentLanguage, t } from "./shared/i18n";
 
 /** App main component. */
-@customElement("lumi-app")
+@customElement("elowen-app")
 export class App extends LightMobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
@@ -58,6 +59,7 @@ export class App extends LightMobxLitElement {
 
   override connectedCallback() {
     super.connectedCallback();
+    applyDocumentLanguage(this.settingsService.responseLanguage.value);
   }
 
   override firstUpdated() {
@@ -81,7 +83,7 @@ export class App extends LightMobxLitElement {
         return this.renderGallery(GalleryView.CURRENT);
       case Pages.ARXIV_DOCUMENT:
         return html`
-          <lumi-reader documentId=${params.document_id}></lumi-reader>
+          <elowen-reader documentId=${params.document_id}></elowen-reader>
         `;
       default:
         return this.render404();
@@ -91,15 +93,17 @@ export class App extends LightMobxLitElement {
   private renderGallery(galleryView: GalleryView = GalleryView.LOCAL) {
     return html`
       <page-header></page-header>
-      <home-gallery-tabs></home-gallery-tabs>
       <div class="content">
         <home-gallery .galleryView=${galleryView}></home-gallery>
       </div>
     `;
   }
 
-  private render404(message = "Page not found") {
-    return html`<div class="content">404: ${message}</div>`;
+  private render404(message?: string) {
+    const text =
+      message ??
+      t("home.pageNotFound", this.settingsService.responseLanguage.value);
+    return html`<div class="content">404: ${text}</div>`;
   }
 
   private renderBanner() {
@@ -109,14 +113,14 @@ export class App extends LightMobxLitElement {
     const bannerProperties = this.bannerService.getBannerProperties()!;
 
     return html`
-      <lumi-banner
+      <elowen-banner
         .text=${bannerProperties.message}
         .icon=${bannerProperties.icon}
         .actionText=${bannerProperties.actionText}
         .actionCallback=${bannerProperties.actionCallback}
         .onBannerClose=${bannerProperties.closeCallback}
       >
-      </lumi-banner>
+      </elowen-banner>
     `;
   }
 
@@ -136,7 +140,7 @@ export class App extends LightMobxLitElement {
         <main style=${mainStyles}>
           <div class="content-wrapper">${this.renderPageContent()}</div>
           <floating-panel-host></floating-panel-host>
-          <lumi-dialogs></lumi-dialogs>
+          <elowen-dialogs></elowen-dialogs>
           <lit-toast ${ref(this.toastRef)}></lit-toast>
         </main>
       </div>
@@ -146,6 +150,6 @@ export class App extends LightMobxLitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "lumi-app": App;
+    "elowen-app": App;
   }
 }

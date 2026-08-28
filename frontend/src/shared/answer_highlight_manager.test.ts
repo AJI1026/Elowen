@@ -17,9 +17,10 @@
 
 import { expect } from "@esm-bundle/chai";
 import { AnswerHighlightManager } from "./answer_highlight_manager";
-import { LumiAnswer } from "./api";
+import { ElowenAnswer } from "./api";
+import { HIGHLIGHT_METADATA_ANSWER_KEY } from "./constants";
 
-const MOCK_ANSWER_1: LumiAnswer = {
+const MOCK_ANSWER_1: ElowenAnswer = {
   id: "ans-1",
   request: {
     highlightedSpans: [
@@ -31,7 +32,7 @@ const MOCK_ANSWER_1: LumiAnswer = {
   timestamp: 0,
 };
 
-const MOCK_ANSWER_2: LumiAnswer = {
+const MOCK_ANSWER_2: ElowenAnswer = {
   id: "ans-2",
   request: {
     highlightedSpans: [{ spanId: "span-1" }],
@@ -97,7 +98,7 @@ describe("AnswerHighlightManager", () => {
   });
 
   it("should handle answers with no highlighted spans gracefully", () => {
-    const answerWithoutHighlights: LumiAnswer = {
+    const answerWithoutHighlights: ElowenAnswer = {
       id: "ans-3",
       request: {},
       responseContent: [],
@@ -105,5 +106,19 @@ describe("AnswerHighlightManager", () => {
     };
     manager.addAnswer(answerWithoutHighlights);
     expect(manager.highlightedSpans.size).to.equal(0);
+  });
+
+  it("should remove highlights for a deleted answer", () => {
+    manager.addAnswer(MOCK_ANSWER_1);
+    manager.addAnswer(MOCK_ANSWER_2);
+
+    manager.removeAnswer(MOCK_ANSWER_1.id);
+
+    expect(manager.getSpanHighlights("span-1")).to.have.lengthOf(1);
+    expect(manager.getSpanHighlights("span-2")).to.be.empty;
+    const remaining = manager.getSpanHighlights("span-1")[0].metadata?.[
+      HIGHLIGHT_METADATA_ANSWER_KEY
+    ] as ElowenAnswer;
+    expect(remaining.id).to.equal(MOCK_ANSWER_2.id);
   });
 });

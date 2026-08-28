@@ -26,18 +26,23 @@ import { customElement } from "lit/decorators.js";
 
 import { core } from "../../core/core";
 import { DialogService } from "../../services/dialog.service";
+import { SettingsService } from "../../services/settings.service";
 
 /**
  * A container component that renders dialogs based on the DialogService state.
  */
-@customElement("lumi-dialogs")
+@customElement("elowen-dialogs")
 export class Dialogs extends MobxLitElement {
   private readonly dialogService = core.getService(DialogService);
+  private readonly settingsService = core.getService(SettingsService);
 
   override render() {
+    // Read language here so all dialogs re-render when EN/中 changes.
+    const lang = this.settingsService.responseLanguage.value;
+    void this.dialogService.dialogProps;
     return html`
       <history-dialog></history-dialog>
-      <user-feedback-dialog></user-feedback-dialog>
+      <user-feedback-dialog .lang=${lang}></user-feedback-dialog>
       <tutorial-dialog></tutorial-dialog>
       <tos-dialog></tos-dialog>
     `;
@@ -46,6 +51,6 @@ export class Dialogs extends MobxLitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "lumi-dialogs": Dialogs;
+    "elowen-dialogs": Dialogs;
   }
 }
