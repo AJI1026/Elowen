@@ -15,13 +15,11 @@
  * limitations under the License.
  */
 
-import { Functions, httpsCallable } from "firebase/functions";
 import { ArxivMetadata, ElowenDoc } from "./elowen_doc";
 import { ElowenAnswer, ElowenAnswerRequest, UserFeedback } from "./api";
 import { PaperData } from "./types_local_storage";
 import { ModelConfig } from "./model_config";
-
-/** Firebase cloud function callables */
+import { httpApi } from "./http_api";
 
 /** The result from requesting a document import. */
 export interface RequestArxivDocImportResult {
@@ -31,107 +29,72 @@ export interface RequestArxivDocImportResult {
 
 /**
  * Requests the import for a given arxiv doc.
- * @param functions The Firebase Functions instance.
- * @param arxivId The ID of the arXiv document to import.
+ * Passes the Settings model config (including API key) so desktop users
+ * do not need a server-side api_config.py.
  */
 export const requestArxivDocImportCallable = async (
-  functions: Functions,
-  arxivId: string
+  _functions: unknown,
+  arxivId: string,
+  modelConfig?: ModelConfig
 ): Promise<RequestArxivDocImportResult> => {
-  const result = await httpsCallable<
-    { arxiv_id: string },
-    RequestArxivDocImportResult
-  >(
-    functions,
-    "request_arxiv_doc_import"
-  )({ arxiv_id: arxivId });
-  return result.data;
+  return httpApi.importPaper(arxivId, {
+    modelConfig,
+    apiKey: modelConfig?.apiKey,
+  });
 };
 
 /**
  * Requests a Elowen answer based on the document and user input.
- * @param functions The Firebase Functions instance.
- * @param doc The full ElowenDoc object.
- * @param request The user's request details.
- * @param modelConfig The user's model configuration (provider/model/key).
- * @returns A ElowenAnswer object.
  */
 export const getElowenResponseCallable = async (
-  functions: Functions,
+  _functions: unknown,
   doc: ElowenDoc,
   request: ElowenAnswerRequest,
   modelConfig: ModelConfig
 ): Promise<ElowenAnswer> => {
-  const result = await httpsCallable<
-    { doc: ElowenDoc; request: ElowenAnswerRequest; modelConfig: ModelConfig },
-    ElowenAnswer
-  >(
-    functions,
-    "get_elowen_response"
-  )({ doc, request, modelConfig });
-
-  return result.data;
+  return httpApi.ask({
+    doc,
+    request,
+    modelConfig,
+    apiKey: modelConfig.apiKey,
+  });
 };
 
 /**
  * Requests arxiv metadata object from the arxiv paper id.
- * @param functions The Firebase Functions instance.
- * @param arxivId Id of the paper to fetch metadata for.
- * @returns A ArxivMetadata object.
  */
 export const getArxivMetadata = async (
-  functions: Functions,
+  _functions: unknown,
   arxivId: string
 ): Promise<ArxivMetadata> => {
-  const result = await httpsCallable<{ arxiv_id: string }, ArxivMetadata>(
-    functions,
-    "get_arxiv_metadata"
-  )({ arxiv_id: arxivId });
-
-  return result.data;
+  return httpApi.getMetadata(arxivId);
 };
 
 /**
  * Requests a personalized summary based on the document and user's history.
- * @param functions The Firebase Functions instance.
- * @param doc The full ElowenDoc object.
- * @param pastPapers The user's past papers from local history.
- * @param modelConfig The user's model configuration (provider/model/key).
- * @returns A PersonalSummary object.
  */
 export const getPersonalSummaryCallable = async (
-  functions: Functions,
+  _functions: unknown,
   doc: ElowenDoc,
   pastPapers: PaperData[],
   modelConfig: ModelConfig
 ): Promise<ElowenAnswer> => {
-  const result = await httpsCallable<
-    { doc: ElowenDoc; past_papers: PaperData[]; modelConfig: ModelConfig },
-    ElowenAnswer
-  >(
-    functions,
-    "get_personal_summary"
-  )({ doc, past_papers: pastPapers, modelConfig });
-
-  return result.data;
+  return httpApi.personalSummary({
+    doc,
+    past_papers: pastPapers,
+    modelConfig,
+    apiKey: modelConfig.apiKey,
+  });
 };
 
 /**
- * Saves user feedback to Firestore.
- * @param functions The Firebase Functions instance.
- * @param feedback The user feedback data.
+ * Saves user feedback.
  */
 export const saveUserFeedbackCallable = async (
-  functions: Functions,
+  _functions: unknown,
   feedback: UserFeedback
 ): Promise<void> => {
-  await httpsCallable<
-    { user_feedback_text: string; arxiv_id?: string },
-    { status: string }
-  >(
-    functions,
-    "save_user_feedback"
-  )({
+  await httpApi.feedback({
     user_feedback_text: feedback.userFeedbackText,
     arxiv_id: feedback.arxivId,
   });

@@ -269,7 +269,7 @@ describe("ElowenDocManager", () => {
       [createSection("sec-1", [createTextContent([span])])],
       []
     );
-    // Simulate Firestore/import docs where abstract was omitted.
+    // Simulate import docs where abstract was omitted.
     (doc as { abstract: null }).abstract = null;
 
     const manager = new ElowenDocManager(doc);

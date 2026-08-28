@@ -42,23 +42,16 @@ class ImageUtilsTest(unittest.TestCase):
         if os.path.exists(self.source_dir):
             shutil.rmtree(self.source_dir)
 
-    @patch('import_pipeline.image_utils.storage')
-    def test_download_image_from_gcs(self, mock_storage):
-        """Tests that image bytes are downloaded from GCS."""
+    def test_download_image_from_local_bucket(self):
+        """Tests that image bytes are read from the local image bucket."""
         storage_path = "test/image.png"
         expected_bytes = b"dummy_image_data"
-
-        mock_bucket = MagicMock()
-        mock_blob = MagicMock()
-        mock_blob.download_as_bytes.return_value = expected_bytes
-        mock_bucket.blob.return_value = mock_blob
-        mock_storage.bucket.return_value = mock_bucket
+        full_path = os.path.join(self.test_bucket_base, storage_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "wb") as f:
+            f.write(expected_bytes)
 
         result_bytes = image_utils.download_image_from_gcs(storage_path)
-
-        mock_storage.bucket.assert_called_once_with()
-        mock_bucket.blob.assert_called_once_with(storage_path)
-        mock_blob.download_as_bytes.assert_called_once_with()
         self.assertEqual(result_bytes, expected_bytes)
 
     def test_check_target_in_path(self):
@@ -95,47 +88,9 @@ class ImageUtilsTest(unittest.TestCase):
         # Non-match when target has extension but full_path does not 
         self.assertFalse(image_utils.check_target_in_path("/a/b/c", "c.png"))
 
-    @patch('import_pipeline.image_utils.storage')
-    def test_extract_images_from_latex_source_cloud(self, mock_storage):
-        """Tests that images are uploaded to cloud storage when run_locally=False."""
-        file_id = "test_file_id"
-        image_contents = [
-            ImageContent(latex_path="fig1.png", storage_path=f"{file_id}/images/fig1.png", alt_text="", width=0, height=0)
-        ]
-
-        # Create a dummy source file
-        with open(os.path.join(self.source_dir, "fig1.png"), "w") as f:
-            f.write("dummy_image_data")
-
-        # Mock storage client
-        mock_bucket = MagicMock()
-        mock_blob = MagicMock()
-        mock_storage.bucket.return_value = mock_bucket
-        mock_bucket.blob.return_value = mock_blob
-
-        with patch('import_pipeline.image_utils.Image.open') as mock_image_open:
-            mock_img = MagicMock()
-            mock_img.width = 100
-            mock_img.height = 150
-            mock_image_open.return_value.__enter__.return_value = mock_img
-
-            # Call with run_locally=False (the default)
-            result_metadata = image_utils.extract_images_from_latex_source(self.source_dir, image_contents, run_locally=False)
-
-            # Assertions for cloud path
-            mock_storage.bucket.assert_called_once_with()
-            mock_bucket.blob.assert_called_once_with(f"{file_id}/images/fig1.png")
-            mock_blob.upload_from_filename.assert_called_once_with(os.path.join(self.source_dir, "fig1.png"))
-
-            # Check metadata and updated ImageContent
-            self.assertEqual(image_contents[0].width, 100)
-            self.assertEqual(image_contents[0].height, 150)
-            expected_metadata = [ImageMetadata(storage_path=f"{file_id}/images/fig1.png", width=100.0, height=150.0)]
-            self.assertEqual(result_metadata, expected_metadata)
-
     @patch('shutil.copy')
     def test_extract_images_from_latex_source_local(self, mock_copy):
-        """Tests that images are copied locally when run_locally=True."""
+        """Tests that images are copied to the local image bucket."""
         file_id = "test_file_id"
         image_contents = [
             ImageContent(latex_path="fig1.png", storage_path=f"{file_id}/images/fig1.png", alt_text="", width=0, height=0)
@@ -151,14 +106,13 @@ class ImageUtilsTest(unittest.TestCase):
             mock_img.height = 150
             mock_image_open.return_value.__enter__.return_value = mock_img
 
-            # Call with run_locally=True
-            result_metadata = image_utils.extract_images_from_latex_source(self.source_dir, image_contents, run_locally=True)
+            result_metadata = image_utils.extract_images_from_latex_source(
+                self.source_dir, image_contents
+            )
 
-            # Assertions for local path
             expected_dest_path = os.path.join(self.test_bucket_base, f"{file_id}/images/fig1.png")
             mock_copy.assert_called_once_with(os.path.join(self.source_dir, "fig1.png"), expected_dest_path)
 
-            # Check metadata and updated ImageContent
             self.assertEqual(image_contents[0].width, 100)
             self.assertEqual(image_contents[0].height, 150)
             expected_metadata = [ImageMetadata(storage_path=f"{file_id}/images/fig1.png", width=100.0, height=150.0)]

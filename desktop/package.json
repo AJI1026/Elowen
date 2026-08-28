@@ -1,0 +1,58 @@
+{
+  "name": "elowen-desktop",
+  "productName": "Elowen",
+  "version": "1.0.0",
+  "description": "Elowen — AI-assisted arXiv reader (local desktop)",
+  "main": "main.js",
+  "author": "Elowen",
+  "license": "Apache-2.0",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "app.elowen.desktop",
+    "productName": "Elowen",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/dist/elowen-api",
+        "to": "elowen-api",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"],
+      "hardenedRuntime": false
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  }
+}

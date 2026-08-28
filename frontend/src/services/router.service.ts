@@ -34,7 +34,6 @@ interface ServiceProvider {
 }
 
 export const ARXIV_DOCS_ROUTE_NAME = "arxiv";
-const DEFAULT_COLLECTION_ID = "pair_team";
 
 /**
  * Handles app routing and page navigation
@@ -117,16 +116,6 @@ export class RouterService extends Service {
     }
 
     const currentPage = this.getPage(this.activeRoute);
-    if (
-      currentPage === Pages.HOME &&
-      !this.sp.historyService.getPaperHistory().length &&
-      !this.hasNavigated
-    ) {
-      this.navigate(Pages.COLLECTION, {
-        collection_id: DEFAULT_COLLECTION_ID,
-      });
-      return;
-    }
 
     // If gallery page, load collections
     if (currentPage === Pages.HOME || currentPage === Pages.COLLECTION) {

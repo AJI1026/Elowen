@@ -22,7 +22,7 @@ import { ConceptTooltipProps } from "../../services/floating_panel_service";
 import { styles } from "./concept_tooltip.scss";
 import { core } from "../../core/core";
 import { DocumentStateService } from "../../services/document_state.service";
-import { FirebaseService } from "../../services/firebase.service";
+import { ApiService } from "../../services/api.service";
 import { SettingsService } from "../../services/settings.service";
 import { HistoryService } from "../../services/history.service";
 import { getElowenResponseCallable } from "../../shared/callables";
@@ -50,7 +50,7 @@ export class ConceptTooltip extends MobxLitElement {
   @state() private loadFailed = false;
 
   private readonly documentStateService = core.getService(DocumentStateService);
-  private readonly firebaseService = core.getService(FirebaseService);
+  private readonly apiService = core.getService(ApiService);
   private readonly settingsService = core.getService(SettingsService);
   private readonly historyService = core.getService(HistoryService);
 
@@ -72,7 +72,7 @@ export class ConceptTooltip extends MobxLitElement {
 
     try {
       this.answer = await getElowenResponseCallable(
-        this.firebaseService.functions,
+        null,
         elowenDoc,
         {
           query: "",

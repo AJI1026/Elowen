@@ -58,16 +58,10 @@ class ElowenAnswer:
 
 @dataclass
 class QueryLog:
-    """Schema for logging user queries to Firestore."""
+    """Schema for logging user queries."""
 
-    created_timestamp: (
-        Any  # Firestore timestamp (created with firestore_v1.SERVER_TIMESTAMP)
-    )
-    expire_timestamp: (
-        # Firestore timestamp (created with Python datetime library, converts
-        # to Firestore timestamp when written)
-        Any
-    )
+    created_timestamp: Any  # datetime or ISO string
+    expire_timestamp: Any  # datetime or ISO string
     answer: ElowenAnswer
     arxiv_id: str
     version: str
@@ -75,10 +69,8 @@ class QueryLog:
 
 @dataclass
 class UserFeedback:
-    """Schema for user feedback stored in Firestore."""
+    """Schema for user feedback."""
 
     user_feedback_text: str
-    created_timestamp: (
-        Any  # Firestore timestamp created with firestore_v1.SERVER_TIMESTAMP
-    )
+    created_timestamp: Any  # datetime or ISO string
     arxiv_id: Optional[str] = None

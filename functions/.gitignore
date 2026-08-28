@@ -4,16 +4,9 @@ models/api_config.py
 # Python bytecode
 __pycache__/
 
-
 # Python virtual environment
 venv/
 *.local
-
-# User api key
-models/api_config.py
-
-# Local emulator data
-.local_emulator_data/
 
 # NLTK data (downloaded at runtime via nltk.download())
 import_pipeline/nltk_data/

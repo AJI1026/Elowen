@@ -20,41 +20,36 @@ import shutil
 import warnings
 import tempfile
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 from PIL import Image
 import pypdfium2 as pdfium
-
-from firebase_admin import storage
 
 from shared.types import ImageMetadata
 from shared.elowen_doc import ImageContent
 
-# TODO(ellenj): Update this eventually to save to the google cloud bucket.
+# Local filesystem image bucket (overridden by backend bootstrap in desktop/API).
 LOCAL_IMAGE_BUCKET_BASE = "../local_image_bucket/"
 TEMPORARY_EXTRACTION_DIR = "temp_extraction"
 
 
 def download_image_from_gcs(storage_path: str) -> bytes:
     """
-    Downloads an image from Google Cloud Storage.
+    Loads an image from the local image bucket.
 
     Args:
-        storage_path (str): The path to the image in the GCS bucket.
+        storage_path (str): Relative path under LOCAL_IMAGE_BUCKET_BASE.
 
     Returns:
         bytes: The image data as bytes.
 
     Raises:
-        Exception: If the image cannot be downloaded.
+        FileNotFoundError: If the image cannot be read.
     """
-    try:
-        cloud_bucket = storage.bucket()
-        blob = cloud_bucket.blob(storage_path)
-        image_bytes = blob.download_as_bytes()
-        return image_bytes
-    except Exception as e:
-        warnings.warn(f"Could not download image from GCS at {storage_path}: {e}")
-        raise
+    path = Path(LOCAL_IMAGE_BUCKET_BASE) / storage_path.lstrip("/")
+    if not path.is_file():
+        raise FileNotFoundError(f"Image not found: {path}")
+    return path.read_bytes()
+
 
 def check_target_in_path(full_path: str, target: str) -> bool:
     """
@@ -82,7 +77,7 @@ def check_target_in_path(full_path: str, target: str) -> bool:
 
     # If the target doesn't have a file extension, allow the full_path to have one.
     if '.' not in os.path.basename(target):
-        # Regex: 
+        # Regex:
         # - (^|/): Matches either the start of the string or a literal '/'
         # - {escaped_target}: The path we're looking for
         # - (\.[^/.]+)?$: Optionally matches a file extension at the end of the string.
@@ -92,10 +87,16 @@ def check_target_in_path(full_path: str, target: str) -> bool:
 
     return re.search(pattern, full_path) is not None
 
-def extract_images_from_latex_source(source_dir: str, image_contents: List[ImageContent], run_locally: bool = False) -> List[ImageMetadata]:
+
+def extract_images_from_latex_source(
+    source_dir: str,
+    image_contents: List[ImageContent],
+    run_locally: bool = True,
+) -> List[ImageMetadata]:
     """
     Finds image files from the LaTeX source directory by searching all
-    subdirectories, copies them to the image bucket, and returns their metadata.
+    subdirectories, copies them to the local image bucket, and returns metadata.
+
     If a file is a PDF, it converts the first page to a PNG before processing.
 
     The search logic matches the end of the file path, so a `latex_path` of
@@ -106,24 +107,25 @@ def extract_images_from_latex_source(source_dir: str, image_contents: List[Image
         source_dir (str): The temporary directory where LaTeX source was extracted.
         image_contents (List[ImageContent]): A list of ImageContent objects
                                              parsed from the model output.
-        run_locally (bool): If true, saves to local filesystem. Otherwise, saves
-                            to cloud storage.
+        run_locally (bool): Kept for call-site compatibility; images are always
+                            saved to the local filesystem.
 
     Returns:
         List[ImageMetadata]: A list of metadata for the successfully processed images.
-        
+
     Raises:
         ValueError: If more than one image with the same name is found in the
                     source directory tree, causing ambiguity.
     """
+    del run_locally  # Always local; parameter retained for API compatibility.
     processed_image_metadata: List[ImageMetadata] = []
-    
+
     with tempfile.TemporaryDirectory() as temp_pdf_conversion_dir:
         for image_content in image_contents:
             # Normalizes the latex_path
             latex_path = os.path.join(*image_content.latex_path.split('/'))
             storage_path = image_content.storage_path
-            
+
             # Search for the image file in all subdirectories of source_dir
             found_paths = []
             for root, _, files in os.walk(source_dir):
@@ -131,45 +133,49 @@ def extract_images_from_latex_source(source_dir: str, image_contents: List[Image
                     full_path = os.path.join(root, file)
                     if check_target_in_path(full_path=full_path, target=latex_path):
                         found_paths.append(full_path)
-            
+
             if len(found_paths) == 0:
-                warnings.warn(f"Could not find image matching path suffix '{latex_path}' in any subdirectory of '{source_dir}'")
+                warnings.warn(
+                    f"Could not find image matching path suffix '{latex_path}' "
+                    f"in any subdirectory of '{source_dir}'"
+                )
                 continue
-            
+
             if len(found_paths) > 1:
-                # This case should be rare if paths are specific enough, but is a safeguard.
-                raise ValueError(f"Found multiple images matching path suffix '{latex_path}' in source directory: {found_paths}. Cannot determine which one to use.")
+                raise ValueError(
+                    f"Found multiple images matching path suffix '{latex_path}' "
+                    f"in source directory: {found_paths}. Cannot determine which one to use."
+                )
 
             source_image_path = found_paths[0]
-            
+
             # PDF conversion logic
             if source_image_path.lower().endswith('.pdf'):
                 try:
                     pdf = pdfium.PdfDocument(source_image_path)
                     num_pages = len(pdf)
                     if num_pages > 1:
-                        warnings.warn(f"PDF '{latex_path}' has {num_pages} pages. Only the first page will be converted.")
+                        warnings.warn(
+                            f"PDF '{latex_path}' has {num_pages} pages. "
+                            "Only the first page will be converted."
+                        )
 
                     if num_pages == 0:
                         raise Exception("pypdfium2 conversion returned no pages.")
-                    
-                    # Render first page to a PIL image
+
                     page = pdf.get_page(0)
                     pil_image = page.render(scale=2).to_pil()
-                    
-                    # Create a new path for the converted image
-                    # The stem is the path without the suffix (i.e. .pdf)
+
                     original_stem = Path(source_image_path).stem
-                    temp_png_path = os.path.join(temp_pdf_conversion_dir, f"{original_stem}_pdf.png")
+                    temp_png_path = os.path.join(
+                        temp_pdf_conversion_dir, f"{original_stem}_pdf.png"
+                    )
                     pil_image.save(temp_png_path, format='PNG')
-                    
-                    # Update source_image_path to point to the new PNG
+
                     source_image_path = temp_png_path
-                    
-                    # Update storage_path to reflect the new file extension
+
                     path = Path(storage_path)
                     new_filename = f"{path.stem}_pdf.png"
-                    # Get the path with the name updated.
                     storage_path = str(path.with_name(new_filename))
                     image_content.storage_path = storage_path
 
@@ -178,33 +184,25 @@ def extract_images_from_latex_source(source_dir: str, image_contents: List[Image
                     continue
 
             try:
-                # Get image dimensions before upload
                 with Image.open(source_image_path) as img:
                     width, height = float(img.width), float(img.height)
 
-                if run_locally:
-                    # Create the destination directory in the image bucket, if needed
-                    # e.g., ../local_image_bucket/file_id/images/
-                    destination_full_path = os.path.join(LOCAL_IMAGE_BUCKET_BASE, storage_path)
-                    os.makedirs(os.path.dirname(destination_full_path), exist_ok=True)
-                    # Copy the file
-                    shutil.copy(source_image_path, destination_full_path)
-                else:
-                    # Upload to cloud storage
-                    cloud_bucket = storage.bucket()
-                    blob = cloud_bucket.blob(storage_path)
-                    blob.upload_from_filename(source_image_path)
-                
-                # Update the width and height on the existing ImageContent object
+                destination_full_path = os.path.join(
+                    LOCAL_IMAGE_BUCKET_BASE, storage_path
+                )
+                os.makedirs(os.path.dirname(destination_full_path), exist_ok=True)
+                shutil.copy(source_image_path, destination_full_path)
+
                 image_content.width = width
                 image_content.height = height
 
-                # Create metadata for the processed image
-                processed_image_metadata.append(ImageMetadata(
-                    storage_path=storage_path,
-                    width=width,
-                    height=height
-                ))
+                processed_image_metadata.append(
+                    ImageMetadata(
+                        storage_path=storage_path,
+                        width=width,
+                        height=height,
+                    )
+                )
             except Exception as e:
                 warnings.warn(f"Could not process image {latex_path}: {e}")
                 continue

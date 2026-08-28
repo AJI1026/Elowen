@@ -23,7 +23,6 @@ import "../elowen_image/elowen_image";
 import { MobxLitElement } from "@adobe/lit-mobx";
 import { CSSResultGroup, html, nothing, PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { Unsubscribe, doc, onSnapshot } from "firebase/firestore";
 import { classMap } from "lit/directives/class-map.js";
 
 import { core } from "../../core/core";
@@ -34,7 +33,7 @@ import {
   RouterService,
   getElowenPaperUrl,
 } from "../../services/router.service";
-import { FirebaseService } from "../../services/firebase.service";
+import { ApiService } from "../../services/api.service";
 import { SnackbarService } from "../../services/snackbar.service";
 
 import {
@@ -49,6 +48,7 @@ import {
   requestArxivDocImportCallable,
   RequestArxivDocImportResult,
 } from "../../shared/callables";
+import { pollVersionDoc } from "../../shared/http_api";
 import { extractArxivId } from "../../shared/string_utils";
 
 import { styles } from "./home_gallery.scss";
@@ -59,7 +59,7 @@ import { GalleryView } from "../../shared/types";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { DialogService, TOSDialogProps } from "../../services/dialog.service";
 import { SettingsService } from "../../services/settings.service";
-import { t } from "../../shared/i18n";
+import { friendlyImportErrorMessage, t } from "../../shared/i18n";
 import { ResponseLanguage } from "../../shared/model_config";
 
 function getStatusDisplayText(status: LoadingStatus, lang: ResponseLanguage) {
@@ -81,7 +81,7 @@ export class HomeGallery extends MobxLitElement {
   private readonly dialogService = core.getService(DialogService);
   private readonly homeService = core.getService(HomeService);
   private readonly routerService = core.getService(RouterService);
-  private readonly firebaseService = core.getService(FirebaseService);
+  private readonly apiService = core.getService(ApiService);
   private readonly historyService = core.getService(HistoryService);
   private readonly snackbarService = core.getService(SnackbarService);
   private readonly settingsService = core.getService(SettingsService);
@@ -96,7 +96,7 @@ export class HomeGallery extends MobxLitElement {
 
   @observable.shallow private unsubscribeListeners = new ObservableMap<
     string,
-    Unsubscribe
+    () => void
   >();
   private loadingStatusMap = new ObservableMap<string, LoadingStatus>();
 
@@ -136,9 +136,11 @@ export class HomeGallery extends MobxLitElement {
   }
 
   private async requestDocument(id: string) {
+    const modelConfig = this.settingsService.getModelConfig();
     const response = await requestArxivDocImportCallable(
-      this.firebaseService.functions,
-      id
+      null,
+      id,
+      modelConfig
     );
     return response;
   }
@@ -146,14 +148,16 @@ export class HomeGallery extends MobxLitElement {
   private async loadDocument() {
     // Extract arXiv ID from potential paper link
     const paperId = extractArxivId(this.paperInput);
+    const lang = this.settingsService.responseLanguage.value;
     if (!paperId) {
       // Paper ID is only empty if input was empty or invalid
-      this.snackbarService.show(
-        t(
-          "home.snackInvalidArxiv",
-          this.settingsService.responseLanguage.value
-        )
-      );
+      this.snackbarService.show(t("home.snackInvalidArxiv", lang));
+      return;
+    }
+
+    const modelConfig = this.settingsService.getModelConfig();
+    if (!modelConfig.apiKey?.trim()) {
+      this.snackbarService.show(t("home.snackImportMissingApiKey", lang));
       return;
     }
 
@@ -165,17 +169,15 @@ export class HomeGallery extends MobxLitElement {
       (paper) => paper.metadata.paperId === paperId
     );
     if (foundPaper && foundPaper.status === "complete") {
-      this.snackbarService.show(
-        t("home.snackAlreadyLoaded", this.settingsService.responseLanguage.value)
-      );
+      this.snackbarService.show(t("home.snackAlreadyLoaded", lang));
     }
 
     try {
       response = await this.requestDocument(paperId);
     } catch (error) {
       this.snackbarService.show(
-        t("home.snackError", this.settingsService.responseLanguage.value, {
-          message: (error as Error).message,
+        friendlyImportErrorMessage(lang, {
+          errorText: (error as Error).message,
         })
       );
       return;
@@ -185,9 +187,7 @@ export class HomeGallery extends MobxLitElement {
 
     if (response.error) {
       this.snackbarService.show(
-        t("home.snackError", this.settingsService.responseLanguage.value, {
-          message: response.error,
-        })
+        friendlyImportErrorMessage(lang, { errorText: response.error })
       );
       return;
     }
@@ -197,9 +197,7 @@ export class HomeGallery extends MobxLitElement {
 
     const metadata = response.metadata;
     if (!metadata || !metadata.version) {
-      this.snackbarService.show(
-        t("home.snackNotFound", this.settingsService.responseLanguage.value)
-      );
+      this.snackbarService.show(t("home.snackNotFound", lang));
       return;
     }
 
@@ -215,43 +213,47 @@ export class HomeGallery extends MobxLitElement {
       this.unsubscribeListeners.get(paperId)?.();
     }
 
-    const docPath = `arxiv_docs/${paperId}/versions/${metadata.version}`;
-    const unsubscribe = onSnapshot(
-      doc(this.firebaseService.firestore, docPath),
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data() as ElowenDoc;
+    const unsubscribe = pollVersionDoc(
+      paperId,
+      metadata.version,
+      (data: ElowenDoc) => {
+        if (data.metadata) {
+          this.loadingStatusMap.set(
+            data.metadata.paperId,
+            data.loadingStatus as LoadingStatus
+          );
+        }
 
-          if (data.metadata) {
-            this.loadingStatusMap.set(
-              data.metadata.paperId,
-              data.loadingStatus as LoadingStatus
-            );
-          }
+        // Once the document has loaded successfully, update its status
+        // to 'complete' and unsubscribe.
+        if (data.loadingStatus === LoadingStatus.SUCCESS) {
+          this.historyService.addPaper(paperId, metadata);
+          // Also update paper image (now that it's available in metadata)
+          this.homeService.loadMetadata([paperId], true);
 
-          // Once the document has loaded successfully, update its status
-          // to 'complete' and unsubscribe.
-          if (data.loadingStatus === LoadingStatus.SUCCESS) {
-            this.historyService.addPaper(paperId, metadata);
-            // Also update paper image (now that it's available in metadata)
-            this.homeService.loadMetadata([paperId], true);
-
-            this.unsubscribeListeners.get(paperId)?.();
-            this.unsubscribeListeners.delete(paperId);
-            this.snackbarService.show(
-              t("home.snackLoaded", this.settingsService.responseLanguage.value)
-            );
-          } else if (
-            LOADING_STATUS_ERROR_STATES.includes(
-              data.loadingStatus as LoadingStatus
-            ) ||
-            data.loadingStatus === LoadingStatus.TIMEOUT
-          ) {
-            this.historyService.deletePaper(paperId);
-            this.unsubscribeListeners.get(paperId)?.();
-            this.unsubscribeListeners.delete(paperId);
-            this.snackbarService.show(`${data.loadingError}`);
-          }
+          this.unsubscribeListeners.get(paperId)?.();
+          this.unsubscribeListeners.delete(paperId);
+          this.snackbarService.show(
+            t("home.snackLoaded", this.settingsService.responseLanguage.value)
+          );
+        } else if (
+          LOADING_STATUS_ERROR_STATES.includes(
+            data.loadingStatus as LoadingStatus
+          ) ||
+          data.loadingStatus === LoadingStatus.TIMEOUT
+        ) {
+          this.historyService.deletePaper(paperId);
+          this.unsubscribeListeners.get(paperId)?.();
+          this.unsubscribeListeners.delete(paperId);
+          this.snackbarService.show(
+            friendlyImportErrorMessage(
+              this.settingsService.responseLanguage.value,
+              {
+                loadingStatus: data.loadingStatus,
+                errorText: data.loadingError,
+              }
+            )
+          );
         }
       }
     );
@@ -434,7 +436,7 @@ export class HomeGallery extends MobxLitElement {
   }
 
   private getImageUrl() {
-    return (path: string) => this.firebaseService.getDownloadUrl(path);
+    return (path: string) => this.apiService.getDownloadUrl(path);
   }
 
   private renderCollection(items: ArxivMetadata[]) {

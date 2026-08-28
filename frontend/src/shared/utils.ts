@@ -15,30 +15,18 @@
  * limitations under the License.
  */
 
-import { Timestamp } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
 
 /** Shared utils. */
 
-// ****************************************************************************
-// CONSTANTS
-// ****************************************************************************
-
 /** ElowenDocument version (in case ElowenDocument object is updated). */
 export const ELOWEN_DOCUMENT_VERSION = 0;
 
-// ****************************************************************************
-// TYPES
-// ****************************************************************************
-
-// Helper for Timestamp (make it work between admin & sdk).
-//
-// Packages firebase-admin/firestore and firebase/firestore use
-// different Timestamp types. This type is a workaround to handle both types
-// in the same codebase.
-// When creating a new Timestamp, use the Timestamp class from the correct
-// package (its type is compatible with this type)
-export type UnifiedTimestamp = Omit<Timestamp, "toJSON">;
+/** ISO date string or epoch millis — formerly Firebase Timestamp. */
+export type UnifiedTimestamp =
+  | string
+  | number
+  | { seconds: number; nanoseconds: number };
 
 /** Temporary ElowenDocument object. */
 export interface ElowenDocument {
@@ -50,21 +38,18 @@ export interface ElowenDocument {
   dateEdited: UnifiedTimestamp;
 }
 
-// ****************************************************************************
-// FUNCTIONS
-// ****************************************************************************
-
 /** Create new ElowenDocument. */
 export function createElowenDocument(
   config: Partial<ElowenDocument> = {}
 ): ElowenDocument {
+  const now = Date.now();
   return {
     id: config.id ?? generateId(),
     versionElowen: config.versionElowen ?? ELOWEN_DOCUMENT_VERSION,
     versionArxiv: config.versionArxiv ?? "",
     content: config.content ?? "",
-    dateCreated: config.dateCreated ?? Timestamp.now(),
-    dateEdited: config.dateEdited ?? Timestamp.now(),
+    dateCreated: config.dateCreated ?? now,
+    dateEdited: config.dateEdited ?? now,
   };
 }
 

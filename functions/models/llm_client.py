@@ -17,18 +17,19 @@
 
 The rest of the codebase calls the convenience functions in ``models.gemini``
 (e.g. ``gemini.call_predict``). This module is the underlying implementation that
-dispatches to the configured provider (Gemini, DeepSeek, OpenAI). It keeps
+dispatches to the configured provider (DeepSeek or OpenAI). It keeps
 ``models.gemini`` as a thin, backward-compatible wrapper so existing call sites
 and tests keep working unchanged.
 """
 
 import json
+import logging
 import time
 from typing import List, Type, TypeVar
 
-from firebase_functions import logger
-
 from models import api_config
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -52,15 +53,31 @@ def _resolve_api_key(api_key: str | None) -> str:
     if api_key:
         logger.info(API_KEY_LOGGING_MESSAGE)
         return api_key
+    from models import request_context
+
+    ctx_key = request_context.get_request_api_key()
+    if ctx_key:
+        logger.info(API_KEY_LOGGING_MESSAGE)
+        return ctx_key
+    cfg = request_context.get_request_model_config() or {}
+    cfg_key = cfg.get("apiKey")
+    if cfg_key:
+        logger.info(API_KEY_LOGGING_MESSAGE)
+        return cfg_key
     return api_config.DEFAULT_API_KEY
 
 
 def _resolve_provider(override: str | None = None) -> str:
-    provider = (override or api_config.MODEL_PROVIDER or "gemini").strip().lower()
-    if provider not in {"gemini", "deepseek", "openai"}:
+    if not override:
+        from models import request_context
+
+        cfg = request_context.get_request_model_config() or {}
+        override = cfg.get("provider") or None
+    provider = (override or api_config.MODEL_PROVIDER or "deepseek").strip().lower()
+    if provider not in {"deepseek", "openai"}:
         raise UnsupportedProviderError(
             f"Unsupported ELOWEN_MODEL_PROVIDER: {provider!r}. "
-            "Expected one of: gemini, deepseek, openai."
+            "Expected one of: deepseek, openai."
         )
     return provider
 
@@ -68,6 +85,12 @@ def _resolve_provider(override: str | None = None) -> str:
 def _resolve_base_url(provider: str, override: str | None = None) -> str:
     if override:
         return override.rstrip("/")
+    from models import request_context
+
+    cfg = request_context.get_request_model_config() or {}
+    cfg_url = cfg.get("baseUrl")
+    if cfg_url:
+        return str(cfg_url).rstrip("/")
     if api_config.BASE_URL:
         return api_config.BASE_URL.rstrip("/")
     return api_config.DEFAULT_BASE_URLS.get(provider, "").rstrip("/")
@@ -93,8 +116,6 @@ def call_predict(
     base_url = _resolve_base_url(provider, base_url)
     max_tokens = max_output_tokens or QUERY_RESPONSE_MAX_OUTPUT_TOKENS
 
-    if provider == "gemini":
-        return _gemini_text(query, model, key, max_tokens=max_tokens)
     return _openai_text(
         query,
         model,
@@ -123,11 +144,9 @@ def call_predict_with_image(
     truncated_query = (prompt[:200] + "...") if len(prompt) > 200 else prompt
     print(f"  > Calling {provider} with image, prompt: '{truncated_query}'")
 
-    if provider == "gemini":
-        return _gemini_image(prompt, image_bytes, model, key)
     if _supports_vision(model):
         return _openai_image(prompt, image_bytes, model, key, base_url)
-    # OpenAI-compatible models without vision support fall back to text-only.
+    # Models without vision support fall back to text-only.
     print(f"  > Model {model!r} may not support images; sending text only.")
     return _openai_text(prompt, model, key, base_url)
 
@@ -152,10 +171,7 @@ def call_predict_with_schema(
     print(f"  > Calling {provider} with schema, prompt: '{truncated_query}'")
 
     try:
-        if provider == "gemini":
-            parsed = _gemini_schema(query, response_schema, model, key)
-        else:
-            parsed = _openai_schema(query, response_schema, model, key, base_url)
+        parsed = _openai_schema(query, response_schema, model, key, base_url)
         print(f"  > {provider} with schema call took: {time.time() - start_time:.2f}s")
         return parsed
     except Exception as e:
@@ -166,8 +182,6 @@ def call_predict_with_schema(
 def _model_matches_provider(provider: str, model: str) -> bool:
     """True when ``model`` looks compatible with ``provider``."""
     name = model.strip().lower()
-    if provider == "gemini":
-        return name.startswith("gemini")
     if provider == "deepseek":
         return name.startswith("deepseek")
     if provider == "openai":
@@ -178,13 +192,16 @@ def _model_matches_provider(provider: str, model: str) -> bool:
 def _resolve_model(
     provider: str, model: str | None, *, strong: bool = False
 ) -> str:
-    """Pick a model name that matches the active provider.
-
-    Hardcoded Gemini defaults from older call sites are ignored when the
-    configured provider is DeepSeek/OpenAI (and vice versa).
-    """
+    """Pick a model name that matches the active provider."""
     if model and _model_matches_provider(provider, model):
         return model
+
+    from models import request_context
+
+    cfg = request_context.get_request_model_config() or {}
+    cfg_model = cfg.get("modelName")
+    if cfg_model and _model_matches_provider(provider, str(cfg_model)):
+        return str(cfg_model)
 
     if strong and api_config.MODEL_NAME_STRONG:
         strong_model = api_config.MODEL_NAME_STRONG
@@ -198,77 +215,14 @@ def _resolve_model(
 
     # Last resort: provider-safe built-in defaults (never cross-provider).
     defaults = {
-        "gemini": ("gemini-2.5-flash", "gemini-2.5-pro"),
         "deepseek": (
             "deepseek-v4-flash-vision-exp",
             "deepseek-v4-flash-vision-exp",
         ),
         "openai": ("gpt-4o-mini", "gpt-4o"),
     }
-    normal, heavy = defaults.get(provider, defaults["gemini"])
+    normal, heavy = defaults.get(provider, defaults["deepseek"])
     return heavy if strong else normal
-
-
-# -----------------------------------------------------------------------------
-# Gemini backend (google-genai SDK)
-# -----------------------------------------------------------------------------
-def _gemini_text(
-    query: str, model: str, api_key: str, max_tokens: int = QUERY_RESPONSE_MAX_OUTPUT_TOKENS
-) -> str:
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model=model,
-        contents=query,
-        config=types.GenerateContentConfig(
-            temperature=0, max_output_tokens=max_tokens
-        ),
-    )
-    if not response.text:
-        raise LLMInvalidResponseException()
-    return response.text
-
-
-def _gemini_image(prompt: str, image_bytes: bytes, model: str, api_key: str) -> str:
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model=model,
-        contents=[
-            prompt,
-            # When imported, paper images are all saved in PNG format.
-            types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
-        ],
-        config=types.GenerateContentConfig(
-            temperature=0, max_output_tokens=QUERY_RESPONSE_MAX_OUTPUT_TOKENS
-        ),
-    )
-    if not response.text:
-        raise LLMInvalidResponseException()
-    return response.text
-
-
-def _gemini_schema(query: str, response_schema: Type[T], model: str, api_key: str) -> T | List[T] | None:
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model=model,
-        contents=query,
-        config={
-            "response_mime_type": "application/json",
-            "response_schema": response_schema,
-            "temperature": 0,
-        },
-    )
-    if not response.parsed:
-        raise LLMInvalidResponseException()
-    return response.parsed
 
 
 # -----------------------------------------------------------------------------

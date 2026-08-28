@@ -1,0 +1,5 @@
+# Electron / build artifacts
+node_modules/
+release/
+*.log
+.DS_Store

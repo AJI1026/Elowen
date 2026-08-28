@@ -1,0 +1,26 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./backend/seed:/app/backend/seed:ro
+      # Hot-reload shared pipeline during local development
+      - ./functions:/app/functions
+      - ./backend/app:/app/backend/app
+    environment:
+      ELOWEN_DATA_DIR: /data
+      ELOWEN_DB_PATH: /data/elowen.sqlite3
+      ELOWEN_IMAGES_DIR: /data/images
+      ELOWEN_SEED_DIR: /app/backend/seed
+      ELOWEN_AUTO_SEED: "1"
+      # Optional model overrides (same as functions/)
+      ELOWEN_MODEL_PROVIDER: ${ELOWEN_MODEL_PROVIDER:-}
+      ELOWEN_API_KEY: ${ELOWEN_API_KEY:-}
+      ELOWEN_MODEL_NAME: ${ELOWEN_MODEL_NAME:-}
+      ELOWEN_MODEL_NAME_STRONG: ${ELOWEN_MODEL_NAME_STRONG:-}
+      ELOWEN_BASE_URL: ${ELOWEN_BASE_URL:-}
+    restart: unless-stopped

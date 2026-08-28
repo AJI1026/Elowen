@@ -1,9 +1,7 @@
 *.log
 *.DS_Store
 *.vscode/
-.firebaserc
 node_modules/
-.java-env/
 
 # Python
 # Byte-compiled / optimized / DLL files
@@ -137,12 +135,35 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Secrets / credentials (never commit)
+*.pem
+*.p12
+id_rsa*
+id_ed25519*
+**/credentials.json
+**/service-account*.json
+functions/models/api_config.py
+application_default_credentials.json
+.credentials.json
+gcloud/
+.config/gcloud/
+
+# Cursor: ignore local IDE state; keep shared rules/hooks
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
 
 # Spyder project settings
 .spyderproject
@@ -193,6 +214,7 @@ functions/debug
 scripts_temp
 
 # Google Application Default Credentials (never commit)
+# (also listed under Secrets / credentials above)
 application_default_credentials.json
 .credentials.json
 gcloud/
@@ -215,3 +237,11 @@ angular_test
 # GCA
 GEMINI.md
 model_context
+
+# Local DB / build artifacts that may contain user data
+data/*.sqlite3
+data/*.sqlite3-*
+data/images/
+backend/dist/
+desktop/release/
+desktop/node_modules/

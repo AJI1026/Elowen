@@ -16,28 +16,18 @@
  */
 
 import { makeObservable, observable, ObservableMap } from "mobx";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  orderBy,
-  query,
-  where,
-} from "firebase/firestore";
 import { ArxivCollection } from "../shared/elowen_collection";
 import {
   ArxivMetadata,
   FeaturedImage,
   MetadataCollectionItem,
 } from "../shared/elowen_doc";
+import { httpApi } from "../shared/http_api";
 
-import { FirebaseService } from "./firebase.service";
 import { HistoryService } from "./history.service";
 import { Service } from "./service";
 
 interface ServiceProvider {
-  firebaseService: FirebaseService;
   historyService: HistoryService;
 }
 
@@ -106,49 +96,29 @@ export class HomeService extends Service {
   }
 
   /**
-   * Fetches `arxiv_collections` documents from Firestore
-   * (called on home page load), then sets current collection
-   * @param forceReload Whether to fetch documents even if previously fetched
+   * Fetches collections from the local API (called on home page load),
+   * then sets current collection
    */
   async loadCollections(
     currentCollectionId: string | undefined,
     forceReload = false
   ) {
-    // First, load collections
     if (!this.hasLoadedCollections || forceReload) {
       this.isLoadingCollections = true;
       try {
-        this.collections = (
-          await getDocs(
-            query(
-              collection(
-                this.sp.firebaseService.firestore,
-                "arxiv_collections"
-              ),
-              where("priority", ">=", 0),
-              orderBy("priority", "desc")
-            )
-          )
-        ).docs.map((doc) => {
-          const collection = doc.data() as ArxivCollection;
-          collection.paperIds.reverse();
-          return collection;
-        });
+        const collections = (await httpApi.getCollections()) as ArxivCollection[];
+        this.collections = collections;
         this.hasLoadedCollections = true;
       } catch (e) {
         console.log(e);
       }
       this.isLoadingCollections = false;
     }
-    // Then. set current collection
     this.setCurrentCollection(currentCollectionId);
   }
 
   /**
-   * Fetches `arxiv_metadata` document matching each given paper ID
-   * and stores in paperMap
-   * @param paperIds documents to load
-   * @param forceReload Whether to fetch documents even if previously fetched
+   * Fetches metadata for each given paper ID and stores in paperMap
    */
   async loadMetadata(paperIds: string[], forceReload = false) {
     for (const paperId of paperIds) {
@@ -156,11 +126,9 @@ export class HomeService extends Service {
         continue;
       }
       try {
-        const metadataItem = (
-          await getDoc(
-            doc(this.sp.firebaseService.firestore, "arxiv_metadata", paperId)
-          )
-        ).data() as MetadataCollectionItem;
+        const metadataItem = (await httpApi.getMetadataItem(
+          paperId
+        )) as MetadataCollectionItem;
         this.paperToMetadataMap.set(paperId, metadataItem.metadata);
         if (metadataItem.featuredImage) {
           this.paperToFeaturedImageMap.set(paperId, metadataItem.featuredImage);

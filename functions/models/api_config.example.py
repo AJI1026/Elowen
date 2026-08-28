@@ -21,23 +21,21 @@ import os
 # Copy this file to api_config.py (gitignored) and set your key / provider:
 #   cp models/api_config.example.py models/api_config.py
 #
-# Supported providers:
-#   * "gemini"   - Google Gemini (default, uses the google-genai SDK)
-#   * "deepseek" - DeepSeek (OpenAI-compatible API)
-#   * "openai"   - OpenAI (OpenAI-compatible API)
+# Supported providers (OpenAI-compatible APIs):
+#   * "deepseek" - DeepSeek (default)
+#   * "openai"   - OpenAI
 #
 # Every value below can be overridden by an environment variable when you
-# start the Firebase emulator / functions (recommended for local / CI).
+# start the FastAPI backend (recommended for local / CI / desktop).
 # ---------------------------------------------------------------------------
 
-# Which provider to use. One of: "gemini", "deepseek", "openai".
+# Which provider to use. One of: "deepseek", "openai".
 # Env: ELOWEN_MODEL_PROVIDER
-MODEL_PROVIDER = os.environ.get("ELOWEN_MODEL_PROVIDER", "gemini").strip().lower()
+MODEL_PROVIDER = os.environ.get("ELOWEN_MODEL_PROVIDER", "deepseek").strip().lower()
 
 # Default model names per provider. Used when ELOWEN_MODEL_NAME /
 # ELOWEN_MODEL_NAME_STRONG are unset so switching provider alone is enough.
 _PROVIDER_DEFAULT_MODELS = {
-    "gemini": ("gemini-2.5-flash", "gemini-2.5-pro"),
     "deepseek": (
         "deepseek-v4-flash-vision-exp",
         "deepseek-v4-flash-vision-exp",
@@ -46,11 +44,10 @@ _PROVIDER_DEFAULT_MODELS = {
 }
 
 _default_model, _default_strong = _PROVIDER_DEFAULT_MODELS.get(
-    MODEL_PROVIDER, _PROVIDER_DEFAULT_MODELS["gemini"]
+    MODEL_PROVIDER, _PROVIDER_DEFAULT_MODELS["deepseek"]
 )
 
 # Model name sent to the provider.
-#   Gemini: "gemini-2.5-flash", "gemini-2.5-pro"
 #   DeepSeek: "deepseek-chat", "deepseek-reasoner",
 #             "deepseek-v4-flash-vision-exp" (vision → images / PDF formatting)
 #   OpenAI: "gpt-4o", "gpt-4o-mini"
@@ -72,7 +69,6 @@ DEFAULT_API_KEY = os.environ.get("ELOWEN_API_KEY", "")
 BASE_URL = os.environ.get("ELOWEN_BASE_URL", "")
 
 DEFAULT_BASE_URLS = {
-    "gemini": "",
     "deepseek": "https://api.deepseek.com",
     "openai": "https://api.openai.com/v1",
 }

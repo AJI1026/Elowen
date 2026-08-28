@@ -125,6 +125,13 @@ const config: webpack.Configuration = {
     compress: true,
     allowedHosts: "all",
     port: 4201,
+    proxy: [
+      {
+        context: ["/api"],
+        target: process.env.ELOWEN_API_PROXY ?? "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
+    ],
   },
 };
 

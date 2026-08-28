@@ -13,10 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 
-from enum import StrEnum
 from dataclasses import dataclass
-from shared.types import ArxivMetadata, LoadingStatus
 from typing import List, Optional
+
+from shared.compat import StrEnum
+from shared.types import ArxivMetadata, LoadingStatus
 
 
 @dataclass

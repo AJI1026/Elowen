@@ -15,7 +15,8 @@
  * limitations under the License.
  */
 
-import { Bytes } from "firebase/firestore";
+/** Opaque binary payload (formerly Firebase Bytes). */
+export type BytesLike = Uint8Array | ArrayBuffer | string;
 
 // Kept in sync with: functions/shared/elowen_doc.py
 export interface Position {
@@ -126,7 +127,7 @@ export interface FigureContent {
 // (The backend will directly write the bytes to storage and does not need this type.)
 export interface ElowenImage {
   storagePath: string;
-  bytes: Bytes;
+  bytes: BytesLike;
 }
 
 export interface HtmlFigureContent {

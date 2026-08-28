@@ -17,9 +17,8 @@
 
 Kept under the ``gemini`` module name so existing call sites
 (``from models import gemini``) and tests (``@patch('...gemini...')``) continue
-to work. The default model names default to Gemini, but the actual provider
-(and model) is resolved from :mod:`models.api_config` — switchable to DeepSeek /
-OpenAI via ``ELOWEN_MODEL_PROVIDER`` etc.
+to work. The actual provider (and model) is resolved from
+:mod:`models.api_config` — DeepSeek or OpenAI via ``ELOWEN_MODEL_PROVIDER`` etc.
 """
 
 import time
@@ -55,8 +54,8 @@ def call_predict(
 ) -> str:
     """Calls the configured LLM with a plain-text prompt.
 
-    Defaults to Gemini but delegates to ``llm_client`` so the provider can be
-    switched via config. ``model_config`` may carry per-request overrides:
+    Delegates to ``llm_client`` so the provider can be switched via config.
+    ``model_config`` may carry per-request overrides:
     ``provider``, ``modelName``, ``baseUrl``, ``apiKey``.
     """
     provider, out_model, base_url, out_key = _unpack_model_config(
@@ -114,16 +113,21 @@ def _unpack_model_config(
     """Extracts per-request overrides from ``model_config``.
 
     Returns ``(provider, model, base_url, api_key)`` where missing fields fall
-    back to ``model_config``'s global defaults (None / empty) so that
-    ``llm_client`` resolves from ``api_config`` when nothing is specified.
+    back to request context, then ``api_config``.
     """
-    if not model_config:
-        return None, default_model, None, default_api_key
+    from models import request_context
 
-    provider = model_config.get("provider") or None
-    model = model_config.get("modelName") or default_model
-    base_url = model_config.get("baseUrl") or None
-    api_key = model_config.get("apiKey") or default_api_key
+    ctx_config = request_context.get_request_model_config() or {}
+    merged: dict = {**ctx_config, **(model_config or {})}
+
+    provider = merged.get("provider") or None
+    model = merged.get("modelName") or default_model
+    base_url = merged.get("baseUrl") or None
+    api_key = (
+        merged.get("apiKey")
+        or default_api_key
+        or request_context.get_request_api_key()
+    )
     return provider, model, base_url, api_key
 
 
@@ -132,74 +136,62 @@ def format_pdf_with_latex(
     latex_string: str,
     concepts: List[ElowenConcept],
     model: str | None = None,
+    api_key: str | None = None,
+    model_config: dict | None = None,
 ) -> str:
-    """Calls the configured LLM to format the pdf, using the latex source.
+    """Calls the configured LLM to format the paper from LaTeX source.
 
-    Gemini receives PDF bytes as multimodal input. OpenAI-compatible providers
-    (DeepSeek/OpenAI) cannot treat PDF bytes as a PNG image, so they receive the
-    LaTeX source embedded in the text prompt instead.
+    DeepSeek/OpenAI receive the LaTeX source embedded in the text prompt
+    (PDF bytes are not sent as multimodal image input).
     """
+    del pdf_data  # Reserved for future multimodal import paths.
     start_time = time.time()
     prompt = prompts.make_import_pdf_prompt(concepts)
     truncated_prompt = (prompt[:200] + "...") if len(prompt) > 200 else prompt
     print(f"  > Calling to format PDF, prompt: '{truncated_prompt}'")
 
-    # Prefer the configured strong model (e.g. deepseek-v4-flash-vision-exp).
-    model = model or api_config.MODEL_NAME_STRONG or api_config.MODEL_NAME
-    provider = (api_config.MODEL_PROVIDER or "gemini").strip().lower()
+    provider, out_model, base_url, out_key = _unpack_model_config(
+        model_config, model or api_config.MODEL_NAME_STRONG or api_config.MODEL_NAME, api_key
+    )
+    provider = (provider or api_config.MODEL_PROVIDER or "deepseek").strip().lower()
 
-    if provider == "gemini":
-        try:
-            response_text = llm_client.call_predict_with_image(
-                prompt=prompt,
-                image_bytes=pdf_data,
-                model=model,
-                api_key=None,
-                strong=True,
-            )
-        except Exception as e:
-            print(f"  > Model PDF formatting failed, falling back to text: {e}")
-            response_text = llm_client.call_predict(
-                query=_build_latex_import_query(prompt, latex_string),
-                model=model,
-                api_key=None,
-                strong=True,
-                max_output_tokens=llm_client.IMPORT_MAX_OUTPUT_TOKENS,
-            )
-    else:
-        # DeepSeek/OpenAI: latex text import. Prefer a non-vision flash model and
-        # disable thinking so reasoning cannot consume the whole token budget.
-        import_model = model
-        if provider == "deepseek" and "vision" in (model or "").lower():
-            import_model = "deepseek-v4-flash"
-            print(
-                f"  > Switching import model from {model!r} to {import_model!r} "
-                "(text-only latex conversion)"
-            )
+    # Prefer a non-vision flash model and disable thinking so reasoning cannot
+    # consume the whole token budget.
+    import_model = out_model
+    if provider == "deepseek" and "vision" in (out_model or "").lower():
+        import_model = "deepseek-v4-flash"
         print(
-            f"  > Using latex text import for provider={provider!r} "
-            f"(latex_chars={len(latex_string)}, model={import_model!r})"
+            f"  > Switching import model from {out_model!r} to {import_model!r} "
+            "(text-only latex conversion)"
         )
-        try:
-            response_text = llm_client.call_predict(
-                query=_build_latex_import_query(prompt, latex_string),
-                model=import_model,
-                api_key=None,
-                strong=True,
-                max_output_tokens=llm_client.IMPORT_MAX_OUTPUT_TOKENS,
-                disable_thinking=True,
-            )
-        except llm_client.LLMInvalidResponseException as e:
-            print(f"  > Import call empty/invalid ({e}); retrying with truncated latex")
-            truncated = (latex_string or "")[:20000]
-            response_text = llm_client.call_predict(
-                query=_build_latex_import_query(prompt, truncated),
-                model=import_model,
-                api_key=None,
-                strong=True,
-                max_output_tokens=llm_client.IMPORT_MAX_OUTPUT_TOKENS,
-                disable_thinking=True,
-            )
+    print(
+        f"  > Using latex text import for provider={provider!r} "
+        f"(latex_chars={len(latex_string)}, model={import_model!r})"
+    )
+    try:
+        response_text = llm_client.call_predict(
+            query=_build_latex_import_query(prompt, latex_string),
+            model=import_model,
+            api_key=out_key,
+            provider=provider,
+            base_url=base_url,
+            strong=True,
+            max_output_tokens=llm_client.IMPORT_MAX_OUTPUT_TOKENS,
+            disable_thinking=True,
+        )
+    except llm_client.LLMInvalidResponseException as e:
+        print(f"  > Import call empty/invalid ({e}); retrying with truncated latex")
+        truncated = (latex_string or "")[:20000]
+        response_text = llm_client.call_predict(
+            query=_build_latex_import_query(prompt, truncated),
+            model=import_model,
+            api_key=out_key,
+            provider=provider,
+            base_url=base_url,
+            strong=True,
+            max_output_tokens=llm_client.IMPORT_MAX_OUTPUT_TOKENS,
+            disable_thinking=True,
+        )
 
     print(f"  > Format PDF call took: {time.time() - start_time:.2f}s")
     print(f"  > Format PDF response chars: {len(response_text or '')}")

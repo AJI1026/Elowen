@@ -167,6 +167,14 @@ const EN = {
 
   "home.snackInvalidArxiv": "Error: Invalid arXiv URL or ID",
   "home.snackError": "Error: {message}",
+  "home.snackImportFailed": "Could not import this paper. Please try again later.",
+  "home.snackImportMissingApiKey":
+    "Import failed: add your API key in Settings (Home → Settings), then try again.",
+  "home.snackImportQuota":
+    "Import failed: model quota exceeded. Check your API key or try again later.",
+  "home.snackImportTimeout": "Import timed out. Please try again.",
+  "home.snackImportInvalidResponse":
+    "Import failed: the model returned an invalid response. Please try again.",
 
   "doc.abstract": "Abstract",
   "doc.references": "References",
@@ -360,6 +368,14 @@ const ZH: Record<MessageKey, string> = {
 
   "home.snackInvalidArxiv": "错误：无效的 arXiv 链接或 ID",
   "home.snackError": "错误：{message}",
+  "home.snackImportFailed": "导入失败，请稍后重试。",
+  "home.snackImportMissingApiKey":
+    "导入失败：请先在「设置」中填写 API Key，然后再试。",
+  "home.snackImportQuota":
+    "导入失败：模型配额已用尽，请检查 API Key 或稍后再试。",
+  "home.snackImportTimeout": "导入超时，请重试。",
+  "home.snackImportInvalidResponse":
+    "导入失败：模型返回异常，请重试。",
 
   "doc.abstract": "摘要",
   "doc.references": "参考文献",
@@ -429,6 +445,44 @@ export function t(
     }
   }
   return text;
+}
+
+/** Map raw import / loading errors to a short, localized snackbar message. */
+export function friendlyImportErrorMessage(
+  lang: ResponseLanguage,
+  opts: { loadingStatus?: string; errorText?: string | null }
+): string {
+  const status = opts.loadingStatus ?? "";
+  const err = (opts.errorText ?? "").toLowerCase();
+
+  if (
+    status === "ERROR_DOCUMENT_LOAD_QUOTA_EXCEEDED" ||
+    status === "ERROR_SUMMARIZING_QUOTA_EXCEEDED" ||
+    err.includes("quota") ||
+    err.includes("resource_exhausted")
+  ) {
+    return t("home.snackImportQuota", lang);
+  }
+  if (status === "TIMEOUT" || err.includes("timeout")) {
+    return t("home.snackImportTimeout", lang);
+  }
+  if (
+    status === "ERROR_DOCUMENT_LOAD_INVALID_RESPONSE" ||
+    status === "ERROR_SUMMARIZING_INVALID_RESPONSE" ||
+    err.includes("invalid response") ||
+    err.includes("empty or invalid")
+  ) {
+    return t("home.snackImportInvalidResponse", lang);
+  }
+  if (
+    err.includes("api_key") ||
+    err.includes("api key") ||
+    err.includes("missing key") ||
+    err.includes("default_api_key")
+  ) {
+    return t("home.snackImportMissingApiKey", lang);
+  }
+  return t("home.snackImportFailed", lang);
 }
 
 export function sidebarTabLabel(

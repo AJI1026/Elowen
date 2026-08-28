@@ -24,11 +24,10 @@ import "../../pair-components/icon_button";
 
 import { CSSResultGroup, html, nothing, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { Unsubscribe, doc, onSnapshot } from "firebase/firestore";
 import { provide } from "@lit/context";
 
 import { core } from "../../core/core";
-import { FirebaseService } from "../../services/firebase.service";
+import { ApiService } from "../../services/api.service";
 import { HistoryService } from "../../services/history.service";
 import { DocumentStateService } from "../../services/document_state.service";
 import { SnackbarService } from "../../services/snackbar.service";
@@ -79,12 +78,12 @@ import {
   SIDEBAR_TABS,
 } from "../../shared/constants";
 import { LightMobxLitElement } from "../light_mobx_lit_element/light_mobx_lit_element";
-import { FirebaseError } from "firebase/app";
+import { pollVersionDoc } from "../../shared/http_api";
 import { RouterService, getArxivPaperUrl } from "../../services/router.service";
 import { BannerService } from "../../services/banner.service";
 import { createRef, ref } from "lit/directives/ref.js";
 import { SettingsService } from "../../services/settings.service";
-import { t } from "../../shared/i18n";
+import { friendlyImportErrorMessage, t } from "../../shared/i18n";
 import {
   DialogService,
   TOSDialogProps,
@@ -120,7 +119,7 @@ export class ElowenReader extends LightMobxLitElement {
   private readonly bannerService = core.getService(BannerService);
   private readonly dialogService = core.getService(DialogService);
   private readonly documentStateService = core.getService(DocumentStateService);
-  private readonly firebaseService = core.getService(FirebaseService);
+  private readonly apiService = core.getService(ApiService);
   private readonly floatingPanelService = core.getService(FloatingPanelService);
   private readonly historyService = core.getService(HistoryService);
   private readonly routerService = core.getService(RouterService);
@@ -139,7 +138,7 @@ export class ElowenReader extends LightMobxLitElement {
 
   private mobileSmartHighlightContainerRef = createRef<HTMLElement>();
 
-  private unsubscribeListener?: Unsubscribe;
+  private unsubscribeListener?: () => void;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -250,10 +249,7 @@ export class ElowenReader extends LightMobxLitElement {
 
     let metadata: ArxivMetadata | null = null;
     try {
-      metadata = await getArxivMetadata(
-        this.firebaseService.functions,
-        this.documentId
-      );
+      metadata = await getArxivMetadata(null, this.documentId);
     } catch (error) {
       console.error("Warning: Document metadata or version not found.", error);
     }
@@ -269,61 +265,44 @@ export class ElowenReader extends LightMobxLitElement {
       this.historyService.addPaper(this.documentId, metadata);
     }
 
-    const docPath = `arxiv_docs/${this.documentId}/versions/${metadata.version}`;
-    this.unsubscribeListener = onSnapshot(
-      doc(this.firebaseService.firestore, docPath),
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data() as ElowenDoc;
+    this.unsubscribeListener = pollVersionDoc(
+      this.documentId,
+      metadata.version,
+      (data: ElowenDoc) => {
+        if (
+          data.loadingStatus === LoadingStatus.SUCCESS ||
+          data.loadingStatus === LoadingStatus.SUMMARIZING
+        ) {
+          this.documentStateService.setDocument(data);
+        }
 
-          if (
-            data.loadingStatus === LoadingStatus.SUCCESS ||
-            data.loadingStatus === LoadingStatus.SUMMARIZING
-          ) {
-            this.documentStateService.setDocument(data);
+        this.setLoadingStatus(data.loadingStatus as LoadingStatus);
+        this.metadata = data.metadata;
+        this.requestUpdate();
+
+        if (
+          LOADING_STATES_ALLOW_PERSONAL_SUMMARY.includes(data.loadingStatus)
+        ) {
+          if (!this.historyService.personalSummaries.has(this.documentId)) {
+            this.fetchPersonalSummary();
           }
+        }
 
-          this.setLoadingStatus(data.loadingStatus as LoadingStatus);
-          this.metadata = data.metadata;
-          this.requestUpdate();
-
-          if (
-            LOADING_STATES_ALLOW_PERSONAL_SUMMARY.includes(data.loadingStatus)
-          ) {
-            // Once the document is fully loaded, check for personal summary.
-            if (!this.historyService.personalSummaries.has(this.documentId)) {
-              this.fetchPersonalSummary();
-            }
-          }
-
-          if (
-            LOADING_STATUS_ERROR_STATES.includes(
-              data.loadingStatus as LoadingStatus
-            )
-          ) {
-            this.snackbarService.show(
-              t("reader.snackLoadError", this.settingsService.responseLanguage.value, {
-                id: this.documentId,
-              })
-            );
-          }
-        } else {
+        if (
+          LOADING_STATUS_ERROR_STATES.includes(
+            data.loadingStatus as LoadingStatus
+          )
+        ) {
           this.snackbarService.show(
-            t("reader.snackNotFound", this.settingsService.responseLanguage.value, {
-              id: this.documentId,
-            })
+            friendlyImportErrorMessage(
+              this.settingsService.responseLanguage.value,
+              {
+                loadingStatus: data.loadingStatus,
+                errorText: data.loadingError,
+              }
+            )
           );
         }
-      },
-      (error) => {
-        this.snackbarService.show(
-          t(
-            "reader.snackLoadErrorDetail",
-            this.settingsService.responseLanguage.value,
-            { message: error.message }
-          )
-        );
-        console.error(error);
       }
     );
   }
@@ -347,7 +326,7 @@ export class ElowenReader extends LightMobxLitElement {
             paper.status === "complete"
         );
       const summaryAnswer = await getPersonalSummaryCallable(
-        this.firebaseService.functions,
+        null,
         currentDoc,
         pastPapers,
         this.settingsService.getModelConfig()
@@ -368,7 +347,7 @@ export class ElowenReader extends LightMobxLitElement {
   }
 
   private get getImageUrl() {
-    return (path: string) => this.firebaseService.getDownloadUrl(path);
+    return (path: string) => this.apiService.getDownloadUrl(path);
   }
 
   private checkChangeTabs() {
@@ -405,7 +384,7 @@ export class ElowenReader extends LightMobxLitElement {
 
     try {
       const response = await getElowenResponseCallable(
-        this.firebaseService.functions,
+        null,
         this.documentStateService.elowenDocManager.elowenDoc,
         request,
         this.settingsService.getModelConfig()
@@ -416,11 +395,11 @@ export class ElowenReader extends LightMobxLitElement {
       let message = t("ask.errorResponse", lang);
 
       if (
-        (e as FirebaseError).code === "functions/unavailable" &&
+        String((e as Error).message || "").toLowerCase().includes("unavailable") || String((e as Error).message || "").toLowerCase().includes("api key") &&
         this.settingsService.apiKey !== ""
       ) {
         message = t("ask.errorApiKey", lang);
-      } else if ((e as FirebaseError).code === "functions/resource-exhausted") {
+      } else if (String((e as Error).message || "").toLowerCase().includes("quota") || String((e as Error).message || "").toLowerCase().includes("resource-exhausted")) {
         message = t("ask.errorQuota", lang);
       }
 
@@ -453,7 +432,7 @@ export class ElowenReader extends LightMobxLitElement {
 
     try {
       const response = await getElowenResponseCallable(
-        this.firebaseService.functions,
+        null,
         currentDoc,
         request,
         this.settingsService.getModelConfig()
@@ -500,7 +479,7 @@ export class ElowenReader extends LightMobxLitElement {
 
     try {
       const response = await getElowenResponseCallable(
-        this.firebaseService.functions,
+        null,
         currentDoc,
         request,
         this.settingsService.getModelConfig()

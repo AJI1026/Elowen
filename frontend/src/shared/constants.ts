@@ -18,12 +18,6 @@
 /** App name. */
 export const APP_NAME = "Elowen";
 
-/** Firebase constants. */
-export const FIREBASE_LOCAL_HOST_PORT_FIRESTORE = 8080;
-export const FIREBASE_LOCAL_HOST_PORT_STORAGE = 9199;
-export const FIREBASE_LOCAL_HOST_PORT_AUTH = 9099;
-export const FIREBASE_LOCAL_HOST_PORT_FUNCTIONS = 5001;
-
 export const VIEWPORT_SMALL_MAX_WIDTH = 600;
 /** @deprecated Use VIEWPORT_SMALL_MAX_WIDTH. Kept for compatibility. */
 export const VIEWPORT_SMALL_MAX_HEIGHT = VIEWPORT_SMALL_MAX_WIDTH;

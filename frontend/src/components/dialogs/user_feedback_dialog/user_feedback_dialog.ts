@@ -27,7 +27,7 @@ import {
   DialogService,
   UserFeedbackDialogProps,
 } from "../../../services/dialog.service";
-import { FirebaseService } from "../../../services/firebase.service";
+import { ApiService } from "../../../services/api.service";
 import { RouterService } from "../../../services/router.service";
 import { SettingsService } from "../../../services/settings.service";
 import { SnackbarService } from "../../../services/snackbar.service";
@@ -44,7 +44,7 @@ export class UserFeedbackDialog extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
   private readonly dialogService = core.getService(DialogService);
-  private readonly firebaseService = core.getService(FirebaseService);
+  private readonly apiService = core.getService(ApiService);
   private readonly routerService = core.getService(RouterService);
   private readonly settingsService = core.getService(SettingsService);
   private readonly snackbarService = core.getService(SnackbarService);
@@ -72,7 +72,7 @@ export class UserFeedbackDialog extends MobxLitElement {
 
     try {
       this.isLoading = true;
-      await saveUserFeedbackCallable(this.firebaseService.functions, {
+      await saveUserFeedbackCallable(null, {
         userFeedbackText: this.feedbackText,
         arxivId,
       });

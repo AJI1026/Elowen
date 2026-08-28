@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Block commits that stage sensitive paths or key-like literals.
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$ROOT" ]]; then
+  exit 0
+fi
+cd "$ROOT"
+
+blocked_paths=(
+  'functions/models/api_config.py'
+  'application_default_credentials.json'
+  '.credentials.json'
+)
+
+# Staged files (Added / Copied / Modified / Renamed)
+staged="$(git diff --cached --name-only --diff-filter=ACMR || true)"
+if [[ -z "$staged" ]]; then
+  exit 0
+fi
+
+fail=0
+
+while IFS= read -r file; do
+  [[ -z "$file" ]] && continue
+  base="$(basename "$file")"
+
+  for blocked in "${blocked_paths[@]}"; do
+    if [[ "$file" == "$blocked" ]]; then
+      echo "pre-commit: refusing to commit sensitive file: $file" >&2
+      fail=1
+    fi
+  done
+
+  case "$file" in
+    .env|.env.*|*.pem|*.p12|id_rsa*|id_ed25519*|*/credentials.json|*/service-account*.json)
+      echo "pre-commit: refusing to commit credential-like path: $file" >&2
+      fail=1
+      ;;
+    .cursor/*)
+      case "$file" in
+        .cursor/rules/*|.cursor/hooks.json|.cursor/hooks/*) ;;
+        *)
+          echo "pre-commit: refusing to commit Cursor local file: $file" >&2
+          fail=1
+          ;;
+      esac
+      ;;
+  esac
+
+  # Skip binary / huge files for content scan
+  if [[ ! -f "$file" ]]; then
+    continue
+  fi
+  # Use staged blob content
+  content="$(git show ":$file" 2>/dev/null || true)"
+  if [[ -z "$content" ]]; then
+    continue
+  fi
+
+  if printf '%s' "$content" | grep -Eiq \
+    '(BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY)|sk-[a-zA-Z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}|(api[_-]?key|secret|token|password)\s*[:=]\s*["'\''][^"'\'']{8,}["'\'']'; then
+    # Allow empty / env-based assignments in examples
+    if printf '%s' "$content" | grep -Eiq \
+      'os\.environ\.get\([^)]+,\s*["'\'']["'\'']\)|getenv\([^)]+,\s*["'\'']["'\'']\)'; then
+      # Still flag if a sk-/AIza literal exists
+      if printf '%s' "$content" | grep -Eiq 'sk-[a-zA-Z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}|BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY'; then
+        echo "pre-commit: key-like secret detected in staged file: $file" >&2
+        fail=1
+      fi
+    else
+      echo "pre-commit: key-like secret detected in staged file: $file" >&2
+      fail=1
+    fi
+  fi
+done <<< "$staged"
+
+if [[ "$fail" -ne 0 ]]; then
+  echo "pre-commit: aborting. Remove secrets / unstage sensitive files, then retry." >&2
+  echo "Hint: put keys in ELOWEN_API_KEY env or local (gitignored) api_config.py." >&2
+  exit 1
+fi
+
+exit 0

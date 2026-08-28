@@ -53,7 +53,7 @@ import { getElowenResponseCallable } from "../../shared/callables";
 import { createTemporaryAnswer } from "../../shared/answer_utils";
 import { RouterService } from "../../services/router.service";
 import { SnackbarService } from "../../services/snackbar.service";
-import { FirebaseService } from "../../services/firebase.service";
+import { ApiService } from "../../services/api.service";
 import { LightMobxLitElement } from "../light_mobx_lit_element/light_mobx_lit_element";
 import { SettingsService } from "../../services/settings.service";
 import { debounce } from "../../shared/utils";
@@ -67,7 +67,7 @@ import { t } from "../../shared/i18n";
 export class ElowenQuestions extends LightMobxLitElement {
   private readonly analyticsService = core.getService(AnalyticsService);
   private readonly documentStateService = core.getService(DocumentStateService);
-  private readonly firebaseService = core.getService(FirebaseService);
+  private readonly apiService = core.getService(ApiService);
   private readonly floatingPanelService = core.getService(FloatingPanelService);
   private readonly historyService = core.getService(HistoryService);
   private readonly routerService = core.getService(RouterService);
@@ -123,7 +123,7 @@ export class ElowenQuestions extends LightMobxLitElement {
 
     try {
       const response = await getElowenResponseCallable(
-        this.firebaseService.functions,
+        null,
         elowenDoc,
         request,
         this.settingsService.getModelConfig()
@@ -164,7 +164,7 @@ export class ElowenQuestions extends LightMobxLitElement {
 
     try {
       const response = await getElowenResponseCallable(
-        this.firebaseService.functions,
+        null,
         elowenDoc,
         request,
         this.settingsService.getModelConfig()

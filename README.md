@@ -14,39 +14,57 @@
 
 ## Running Elowen locally
 
-### Set up Firebase functions and emulators
+Local stack is **FastAPI + SQLite + filesystem images** (no Firebase).
 
-Follow instructions in
-[`functions/README.md`](./functions/README.md)
-to install relevant dependencies and run local emulators.
-
-Server-side model and API key (paper import, PDF formatting, etc.) live in the
-local file `functions/models/api_config.py` (copy from
-`api_config.example.py`; the real file is gitignored). You can also override
-them with `ELOWEN_MODEL_PROVIDER`, `ELOWEN_MODEL_NAME`,
-`ELOWEN_MODEL_NAME_STRONG`, `ELOWEN_API_KEY`, and `ELOWEN_BASE_URL`. See
-`functions/README.md` for details.
-
-The API key in the web app Settings page is separate: it is stored in the
-browser and used for in-paper Ask / highlights, not for server import.
-
-### Start frontend web app
+### Quick start (recommended)
 
 ```bash
-cd frontend  # If navigating from top level
-npm install  # Only run once
+# From repo root — first run creates venv & installs deps
+chmod +x start-api.sh start-dev.sh   # once
 
-# Create an index.html file and (optionally) replace the placeholder
-# analytics ID (see TODOs in example file) with your Google Analytics ID
-cp index.example.html index.html
+./start-api.sh      # API only → http://127.0.0.1:8000
+# or
+./start-dev.sh      # API + frontend → http://localhost:4201
+```
 
-# Create a firebase_config.ts file and replace the placeholder.
-cp firebase_config.example.ts firebase_config.ts
+Optional once: set your API key in the app **Settings** (used for import + Ask).
+Server-side `ELOWEN_API_KEY` / `api_config.py` remains an optional fallback for
+headless / CI use. **Never commit** real API keys — run `./scripts/setup-git-hooks.sh`
+once so pre-commit blocks them.
 
+Docker alternative: `docker compose up --build`
+
+Data lives under `./data/` (SQLite + `images/`). Seed fixtures in `backend/seed/`
+load on first boot.
+
+The API key in the web app Settings page is used for paper import and for
+in-paper Ask / highlights (stored in the browser / local app storage).
+
+### Frontend only (API already running)
+
+```bash
+cd frontend
+npm install   # once
+cp index.example.html index.html   # once
 npm run start
 ```
 
-Then, view the app at http://localhost:4201.
+Webpack proxies `/api` → `http://127.0.0.1:8000`. Open http://localhost:4201.
+
+Demo collection: http://localhost:4201/#/collections/test
+
+### Toward a downloadable desktop app
+
+Build a macOS/Windows/Linux installer (Electron + bundled API):
+
+```bash
+./scripts/build-desktop.sh
+```
+
+Artifacts appear in `desktop/release/` (e.g. `.dmg`). See [`desktop/README.md`](desktop/README.md).
+
+User data (SQLite + images) is stored under the OS app-support directory after install.
+
 
 ### Storybook stories
 
@@ -77,7 +95,8 @@ configuration and
 npm run deploy:prod
 ```
 
-To deploy the Firebase cloud functions, see functions/README.md.
+The Python import/LLM logic lives under `functions/` and is loaded by the
+FastAPI backend; see `functions/README.md`.
 
 ## License and Disclaimer
 
