@@ -19,4 +19,18 @@
 .reference-tooltip-component {
   max-width: 400px;
   padding: common.$spacing-large;
+  @include common.flex-column;
+  gap: common.$spacing-small;
+}
+
+.reference-external-link {
+  @include common.flex-row-align-center;
+  gap: common.$spacing-xs;
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--md-sys-color-primary, #1a73e8);
+  font: inherit;
 }

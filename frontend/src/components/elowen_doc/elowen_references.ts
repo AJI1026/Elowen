@@ -34,6 +34,7 @@ import { getSpanHighlightsFromManagers } from "../elowen_span/elowen_span_utils"
 import { core } from "../../core/core";
 import { SettingsService } from "../../services/settings.service";
 import { t } from "../../shared/i18n";
+import { getReferenceExternalLink } from "../../shared/reference_link_utils";
 
 @customElement("elowen-references")
 export class ElowenReferences extends LightMobxLitElement {
@@ -54,25 +55,52 @@ export class ElowenReferences extends LightMobxLitElement {
     target: HTMLElement
   ) => void;
 
+  private renderExternalLink(reference: ElowenReference) {
+    const link = getReferenceExternalLink(reference.span?.text);
+    if (!link) return nothing;
+
+    const lang = this.settingsService.responseLanguage.value;
+    const open = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(link.url, "_blank", "noopener,noreferrer");
+    };
+
+    return html`
+      <pr-icon-button
+        class="open-button reference-external-link"
+        variant="default"
+        icon="open_in_new"
+        title=${t("doc.openReference", lang)}
+        aria-label=${t("doc.openReference", lang)}
+        @click=${open}
+      >
+      </pr-icon-button>
+    `;
+  }
+
   private renderReference(reference: ElowenReference) {
     const elowenSpanClasses = classMap({
       reference: true,
     });
 
-    return html`<elowen-span
-      id=${reference.id}
-      class=${elowenSpanClasses}
-      .span=${reference.span}
-      .highlights=${getSpanHighlightsFromManagers(
-        reference.span.id,
-        this.highlightManager,
-        this.answerHighlightManager,
-        this.userHighlightManager
-      )}
-      .onAnswerHighlightClick=${this.onAnswerHighlightClick}
-      .onUserAnnotationClick=${this.onUserAnnotationClick}
-      .font=${ElowenFont.PAPER_TEXT}
-    ></elowen-span>`;
+    return html`<div class="reference-row">
+      <elowen-span
+        id=${reference.id}
+        class=${elowenSpanClasses}
+        .span=${reference.span}
+        .highlights=${getSpanHighlightsFromManagers(
+          reference.span.id,
+          this.highlightManager,
+          this.answerHighlightManager,
+          this.userHighlightManager
+        )}
+        .onAnswerHighlightClick=${this.onAnswerHighlightClick}
+        .onUserAnnotationClick=${this.onUserAnnotationClick}
+        .font=${ElowenFont.PAPER_TEXT}
+      ></elowen-span>
+      ${this.renderExternalLink(reference)}
+    </div>`;
   }
 
   override render() {

@@ -40,5 +40,20 @@
         font-size: common.$mobile-header-font-size;
       }
     }
+
+    .reference-row {
+      @include common.flex-row;
+      align-items: flex-start;
+      gap: common.$spacing-xs;
+    }
+
+    .reference-external-link {
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .open-button {
+      --md-icon-button-icon-size: 18px;
+    }
   }
 }

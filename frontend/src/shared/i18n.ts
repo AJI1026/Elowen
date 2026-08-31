@@ -178,6 +178,7 @@ const EN = {
 
   "doc.abstract": "Abstract",
   "doc.references": "References",
+  "doc.openReference": "Open reference",
   "doc.footnotes": "Footnotes",
   "doc.published": "Published: {date}",
 
@@ -379,6 +380,7 @@ const ZH: Record<MessageKey, string> = {
 
   "doc.abstract": "摘要",
   "doc.references": "参考文献",
+  "doc.openReference": "打开外部文献",
   "doc.footnotes": "脚注",
   "doc.published": "发表于：{date}",
 
