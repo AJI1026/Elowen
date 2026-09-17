@@ -1,0 +1,16 @@
+{
+  "modelProvider": "deepseek",
+  "providerSettings": {
+    "deepseek": {
+      "modelName": "deepseek-v4-flash-vision-exp",
+      "baseUrl": "https://api.deepseek.com",
+      "apiKey": ""
+    },
+    "openai": {
+      "modelName": "gpt-4o-mini",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": ""
+    }
+  },
+  "responseLanguage": "zh"
+}

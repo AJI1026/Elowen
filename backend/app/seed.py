@@ -99,16 +99,29 @@ def seed_if_empty(session: Session, seed_dir: Path | None = None) -> None:
             if not paper_id:
                 continue
             doc = {k: v for k, v in item.items() if not k.startswith("_")}
-            session.add(
-                PaperVersion(
-                    paper_id=paper_id,
-                    version=version,
-                    loading_status=doc.get("loadingStatus") or "",
-                    loading_error=doc.get("loadingError"),
-                    elowen_doc_json=_dumps(doc),
-                    updated_at=_parse_ts(doc.get("updatedTimestamp")),
+            # Upsert: PaperVersion PK is autoincrement, unique on (paper_id, version)
+            existing = session.scalar(
+                select(PaperVersion).where(
+                    PaperVersion.paper_id == paper_id,
+                    PaperVersion.version == version,
                 )
             )
+            if existing is None:
+                session.add(
+                    PaperVersion(
+                        paper_id=paper_id,
+                        version=version,
+                        loading_status=doc.get("loadingStatus") or "",
+                        loading_error=doc.get("loadingError"),
+                        elowen_doc_json=_dumps(doc),
+                        updated_at=_parse_ts(doc.get("updatedTimestamp")),
+                    )
+                )
+            else:
+                existing.loading_status = doc.get("loadingStatus") or ""
+                existing.loading_error = doc.get("loadingError")
+                existing.elowen_doc_json = _dumps(doc)
+                existing.updated_at = _parse_ts(doc.get("updatedTimestamp"))
 
     session.commit()
     logger.info("Seeded database from %s", seed_dir)

@@ -85,6 +85,7 @@ export class TutorialDialog extends MobxLitElement {
     const lang = this.uiLang();
     const tips = [
       "tutorial.tipExplain",
+      "tutorial.tipTranslate",
       "tutorial.tipAsk",
       "tutorial.tipMindmap",
       "tutorial.tipNotes",

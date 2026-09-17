@@ -91,8 +91,8 @@ export class AnswerItem extends LightMobxLitElement {
   @state() private referencedSpans: ElowenSpan[] = [];
   @state() private isHighlightExpanded = false;
 
-  /** Collapse long quoted highlights unless the user expands them. */
-  private static readonly HIGHLIGHT_COLLAPSE_CHARS = 220;
+  /** Collapse quoted highlights that would wrap past a few lines. */
+  private static readonly HIGHLIGHT_COLLAPSE_CHARS = 120;
 
   private toggleReferences() {
     this.areReferencesShown = !this.areReferencesShown;
@@ -296,7 +296,8 @@ export class AnswerItem extends LightMobxLitElement {
       !!highlight &&
       !query &&
       !image &&
-      responseMode !== "mindmap"
+      responseMode !== "mindmap" &&
+      responseMode !== "translate"
     );
   }
 
@@ -417,6 +418,12 @@ export class AnswerItem extends LightMobxLitElement {
   private getTitleText() {
     const lang = this.uiLang();
     const { query, highlight, image, responseMode } = this.answer.request;
+    if (responseMode === "translate") {
+      if (!highlight) return t("answer.translateText", lang);
+      return this.isCollapsed()
+        ? t("answer.translateHighlight", lang, { highlight })
+        : t("answer.translateText", lang);
+    }
     if (query) return query;
     if (responseMode === "mindmap") {
       return highlight
@@ -497,9 +504,10 @@ export class AnswerItem extends LightMobxLitElement {
               ></pr-icon-button>
               <span
                 class=${classMap(questionTextClasses)}
-                title=${this.answer.request.query}
+                title=${this.getTitleText()}
               >
-                ${this.getTitleText()} ${this.renderInfoIcon()}
+                <span class="question-text-label">${this.getTitleText()}</span>
+                ${this.renderInfoIcon()}
               </span>
             </div>
             ${this.renderCancelButton()}

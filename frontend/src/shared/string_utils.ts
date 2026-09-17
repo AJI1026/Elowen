@@ -58,3 +58,56 @@ export function parseColonKeyValue(originalString: string): {
   const value = split.slice(1).join(":").trim();
   return { key, value };
 }
+
+const LATEX_TYPED_REF_PREFIX: Record<string, string> = {
+  fig: "Fig.",
+  figure: "Fig.",
+  eq: "Eq.",
+  eqn: "Eq.",
+  equation: "Eq.",
+  tab: "Table",
+  table: "Table",
+  sec: "Sec.",
+  section: "Sec.",
+};
+
+function humanizeLatexRefLabel(label: string): string {
+  const trimmed = label.trim();
+  const colon = trimmed.lastIndexOf(":");
+  return colon >= 0 ? trimmed.slice(colon + 1).trim() : trimmed;
+}
+
+function fallbackLatexRefText(label: string): string {
+  const raw = label.trim();
+  const colon = raw.indexOf(":");
+  const key = colon >= 0 ? raw.slice(0, colon).toLowerCase() : "";
+  const name = humanizeLatexRefLabel(raw);
+  const prefix = LATEX_TYPED_REF_PREFIX[key];
+  return prefix ? `${prefix} ${name}` : name;
+}
+
+export function sanitizeUnresolvedLatex(text: string): string {
+  if (!text) return text;
+  if (
+    !text.includes("\\ref") &&
+    !text.includes("\\eqref") &&
+    !text.includes("\\cref") &&
+    !text.includes("\\Cref") &&
+    !text.includes("\\autoref") &&
+    !text.includes("~")
+  ) {
+    return text;
+  }
+
+  const prefixed =
+    /(Fig(?:ure)?\.?|Tab(?:le)?\.?|Eq(?:n|uation)?\.?|Sec(?:tion)?\.?)\s*~?\s*\\(?:eqref|[Cc]ref\*?|autoref|ref\*?)\s*\{([^}]+)\}/g;
+  const bare = /\\(?:eqref|[Cc]ref\*?|autoref|ref\*?)\s*\{([^}]+)\}/g;
+
+  let out = text.replace(
+    prefixed,
+    (_match, prefix: string, label: string) =>
+      `${prefix} ${humanizeLatexRefLabel(label)}`
+  );
+  out = out.replace(bare, (_match, label: string) => fallbackLatexRefText(label));
+  return out.replace(/(\S)~(\S)/g, "$1 $2");
+}

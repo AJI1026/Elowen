@@ -36,4 +36,11 @@ export interface PaperData {
   annotations?: UserAnnotation[];
   status: "loading" | "complete";
   addedTimestamp?: number;
+  /** Rolling summary of older Q&A turns (server-compressed). */
+  conversationSummary?: string;
+  /**
+   * How many oldest history items are already folded into
+   * ``conversationSummary`` (so they need not be re-sent).
+   */
+  conversationSummaryThrough?: number;
 }

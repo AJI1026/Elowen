@@ -38,6 +38,22 @@ describe("elowen-span", () => {
     expect(spanElement?.textContent?.trim()).to.equal("hello world");
   });
 
+  it("renders leftover LaTeX figure refs as readable text", async () => {
+    const span: ElowenSpan = {
+      id: "s1",
+      text: "As shown in Fig.~\\ref{fig:teaser}, our method is faster.",
+      innerTags: [],
+    };
+
+    const el = await fixture<ElowenSpanViz>(
+      html`<elowen-span .span=${span}></elowen-span>`
+    );
+    const spanElement = el.querySelector(`#${span.id}`);
+    expect(spanElement?.textContent?.trim()).to.equal(
+      "As shown in Fig. teaser, our method is faster."
+    );
+  });
+
   it("renders a span with bold text", async () => {
     const span: ElowenSpan = {
       id: "s1",

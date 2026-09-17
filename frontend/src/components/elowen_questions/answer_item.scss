@@ -102,7 +102,7 @@ answer-item {
   &.is-text-collapsed .highlight-text {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 4;
+    -webkit-line-clamp: 3;
     overflow: hidden;
   }
 
@@ -182,12 +182,25 @@ answer-item {
     -moz-transition: opacity 0.25s ease;
     -webkit-transition: opacity 0.25s ease;
 
+    .question-text-label {
+      flex: 1;
+      min-width: 0;
+    }
+
     &.is-collapsed {
       opacity: 0.5;
       font-style: italic;
       padding-right: common.$spacing-medium;
+      flex-wrap: nowrap;
 
       --pr-icon-color: var(--md-sys-color-on-surface-higher);
+
+      .question-text-label {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        overflow: hidden;
+      }
     }
 
     .c-elowen-info-icon {

@@ -19,7 +19,7 @@ import { expect } from "@esm-bundle/chai";
 import { fixture, html } from "@open-wc/testing";
 import { CITATION_CLASSNAME, FOOTNOTE_CLASSNAME } from "./constants";
 
-import { getSelectionInfo, normalizeSelectionText, looksLikeFragmentedClipboardText } from "./selection_utils";
+import { getSelectionInfo, getWordAtCharacterElement, getWordCharElements, normalizeSelectionText, looksLikeFragmentedClipboardText } from "./selection_utils";
 import "./elowen_doc";
 
 describe("normalizeSelectionText", () => {
@@ -275,5 +275,60 @@ describe("getSelectionInfo", () => {
       { spanId: "test-span-2", position: { startIndex: 0, endIndex: 14 } },
       { spanId: "test-span-3", position: { startIndex: 0, endIndex: 5 } },
     ]);
+  });
+});
+
+describe("getWordAtCharacterElement", () => {
+  it("expands a clicked latin character to the full word", async () => {
+    const elowenSpan = document.createElement("elowen-span");
+    elowenSpan.id = "word-span";
+    const renderer = createCharacterSpans("Hello world");
+    renderer.className = "elowen-span-renderer-element";
+    elowenSpan.appendChild(renderer);
+    document.body.appendChild(elowenSpan);
+
+    const chars = renderer.querySelectorAll("span");
+    const eChar = chars[1] as HTMLElement; // "e" in Hello
+    const info = getWordAtCharacterElement(eChar);
+
+    expect(info).to.not.be.null;
+    expect(info!.selectedText).to.equal("Hello");
+    expect(info!.highlightSelection).to.deep.equal([
+      { spanId: "word-span", position: { startIndex: 0, endIndex: 5 } },
+    ]);
+
+    elowenSpan.remove();
+  });
+
+  it("returns null for whitespace", async () => {
+    const elowenSpan = document.createElement("elowen-span");
+    elowenSpan.id = "space-span";
+    const renderer = createCharacterSpans("ab cd");
+    renderer.className = "elowen-span-renderer-element";
+    elowenSpan.appendChild(renderer);
+    document.body.appendChild(elowenSpan);
+
+    const space = renderer.children[2] as HTMLElement;
+    expect(getWordAtCharacterElement(space)).to.be.null;
+
+    elowenSpan.remove();
+  });
+
+  it("returns the character spans of the hovered word", async () => {
+    const elowenSpan = document.createElement("elowen-span");
+    elowenSpan.id = "hover-span";
+    const renderer = createCharacterSpans("Hello world");
+    renderer.className = "elowen-span-renderer-element";
+    elowenSpan.appendChild(renderer);
+    document.body.appendChild(elowenSpan);
+
+    const chars = Array.from(renderer.children) as HTMLElement[];
+    const elements = getWordCharElements(chars[1]); // "e" in Hello
+
+    expect(elements).to.deep.equal(chars.slice(0, 5));
+    expect(elements.map((el) => el.textContent).join("")).to.equal("Hello");
+    expect(getWordCharElements(chars[5])).to.deep.equal([]); // space
+
+    elowenSpan.remove();
   });
 });

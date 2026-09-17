@@ -19,7 +19,6 @@ import { action, computed, makeObservable, observable } from "mobx";
 import { Service } from "./service";
 import { ElowenAnswer } from "../shared/api";
 import { PaperData, UserAnnotation } from "../shared/types_local_storage";
-import { LocalStorageService } from "./local_storage.service";
 import { ArxivMetadata } from "../shared/elowen_doc";
 import { sortPaperDataByTimestamp } from "../shared/elowen_paper_utils";
 import { PERSONAL_SUMMARY_QUERY_NAME } from "../shared/constants";
@@ -28,17 +27,15 @@ import { UserHighlightManager } from "../shared/user_highlight_manager";
 import { HistoryCollapseManager } from "../shared/history_collapse_manager";
 import { ScrollState } from "../contexts/scroll_context";
 import { getAllSpansFromContents } from "../shared/elowen_doc_utils";
+import { httpApi } from "../shared/http_api";
 
-const PAPER_KEY_PREFIX = "elowen-paper:";
+const LEGACY_PAPER_KEY_PREFIX = "elowen-paper:";
 const INITIAL_SUMMARY_COLLAPSE_STATE = true;
-
-interface ServiceProvider {
-  localStorageService: LocalStorageService;
-}
+const SAVE_DEBOUNCE_MS = 400;
 
 /**
- * A service to manage the history of Elowen questions and answers.
- * History is stored per document ID in local storage.
+ * History of Elowen questions / papers.
+ * Paper list + per-paper state persist in data/ (SQLite) via the local API.
  */
 export class HistoryService extends Service {
   answers = new Map<string, ElowenAnswer[]>();
@@ -46,14 +43,18 @@ export class HistoryService extends Service {
   paperMetadata = new Map<string, ArxivMetadata>();
   personalSummaries = new Map<string, ElowenAnswer>();
   annotations = new Map<string, UserAnnotation[]>();
+  /** In-memory PaperData mirror of the server library. */
+  paperDataMap = new Map<string, PaperData>();
   readonly answerHighlightManager: AnswerHighlightManager;
   readonly userHighlightManager: UserHighlightManager;
   readonly historyCollapseManager: HistoryCollapseManager;
 
   private scrollState?: ScrollState;
   private readonly spanIdToAnswerIdMap = new Map<string, string>();
+  private readonly saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private persistSuspended = false;
 
-  constructor(private readonly sp: ServiceProvider) {
+  constructor() {
     super();
     this.answerHighlightManager = new AnswerHighlightManager();
     this.userHighlightManager = new UserHighlightManager();
@@ -64,6 +65,7 @@ export class HistoryService extends Service {
       paperMetadata: observable.shallow,
       personalSummaries: observable.shallow,
       annotations: observable.shallow,
+      paperDataMap: observable.shallow,
       isAnswerLoading: computed,
       addAnswer: action,
       removeAnswer: action,
@@ -78,7 +80,6 @@ export class HistoryService extends Service {
       addLoadingPaper: action,
       deletePaper: action,
       clearAllHistory: action,
-      getPaperHistory: observable,
     });
   }
 
@@ -100,50 +101,147 @@ export class HistoryService extends Service {
     return true;
   }
 
-  override initialize(): void {
-    // Load all paper data from local storage on initialization
-    const paperKeys = this.sp.localStorageService.listKeys(PAPER_KEY_PREFIX);
+  override async initialize(): Promise<void> {
+    this.persistSuspended = true;
+    try {
+      let papers = await httpApi.getLibrary();
+      if (!Array.isArray(papers) || papers.length === 0) {
+        const migrated = this.readLegacyBrowserPapers();
+        if (migrated.length > 0) {
+          for (const paper of migrated) {
+            const id = paper.metadata?.paperId;
+            if (!id) continue;
+            await httpApi.putLibraryPaper(id, paper);
+          }
+          this.clearLegacyBrowserPapers();
+          papers = await httpApi.getLibrary();
+        }
+      } else {
+        this.clearLegacyBrowserPapers();
+      }
+      this.hydrateFromPapers(Array.isArray(papers) ? papers : []);
+    } catch (e) {
+      console.warn("Failed to load library from server; trying browser migration", e);
+      const migrated = this.readLegacyBrowserPapers();
+      if (migrated.length > 0) {
+        this.hydrateFromPapers(migrated);
+        for (const paper of migrated) {
+          const id = paper.metadata?.paperId;
+          if (!id) continue;
+          try {
+            await httpApi.putLibraryPaper(id, paper);
+          } catch {
+            // keep in-memory
+          }
+        }
+        this.clearLegacyBrowserPapers();
+      }
+    } finally {
+      this.persistSuspended = false;
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("beforeunload", () => this.flushPendingSaves());
+    }
+  }
+
+  private hydrateFromPapers(papers: PaperData[]) {
     const allAnswers: ElowenAnswer[] = [];
     const allAnnotations: UserAnnotation[] = [];
-    for (const key of paperKeys) {
-      const paperData = this.sp.localStorageService.getData<PaperData | null>(
-        key,
-        null
-      );
-      if (paperData) {
-        const paperId = paperData.metadata.paperId;
-        this.paperMetadata.set(paperId, paperData.metadata);
-        this.answers.set(paperId, paperData.history);
-        allAnswers.push(...paperData.history);
-        if (paperData.personalSummary) {
-          this.personalSummaries.set(paperId, paperData.personalSummary);
-          this.historyCollapseManager.setAnswerCollapsed(
-            paperData.personalSummary.id,
-            INITIAL_SUMMARY_COLLAPSE_STATE
-          );
-        }
-        if (paperData.annotations) {
-          this.annotations.set(paperId, paperData.annotations);
-          allAnnotations.push(...paperData.annotations);
-        }
+    for (const paperData of papers) {
+      if (!paperData?.metadata?.paperId) continue;
+      const paperId = paperData.metadata.paperId;
+      this.paperDataMap.set(paperId, paperData);
+      this.paperMetadata.set(paperId, paperData.metadata);
+      this.answers.set(paperId, paperData.history ?? []);
+      allAnswers.push(...(paperData.history ?? []));
+      if (paperData.personalSummary) {
+        this.personalSummaries.set(paperId, paperData.personalSummary);
+        this.historyCollapseManager.setAnswerCollapsed(
+          paperData.personalSummary.id,
+          INITIAL_SUMMARY_COLLAPSE_STATE
+        );
+      }
+      if (paperData.annotations) {
+        this.annotations.set(paperId, paperData.annotations);
+        allAnnotations.push(...paperData.annotations);
       }
     }
     this.answerHighlightManager.populateFromAnswers(allAnswers);
     this.userHighlightManager.populateFromAnnotations(allAnnotations);
     this.historyCollapseManager.initialize(allAnswers);
-
     for (const answer of allAnswers) {
       this.updateAnswerSpansMap(answer);
     }
   }
 
-  /**
-   * Retrieves the answer history for a given document ID.
-   * @param docId The ID of the document.
-   * @returns An array of ElowenAnswer objects, or an empty array if none exist.
-   */
   getAnswers(docId: string): ElowenAnswer[] {
     return this.answers.get(docId) || [];
+  }
+
+  /**
+   * Prior answers for LLM context (oldest first). UI stores newest first.
+   * Prefer ``getAskContext`` so already-summarized turns are not re-sent.
+   */
+  getConversationHistory(docId: string, limit = 24): ElowenAnswer[] {
+    const answers = this.getAnswers(docId).filter((a) => !a.isLoading);
+    return [...answers].reverse().slice(-limit);
+  }
+
+  getConversationSummary(docId: string): string | undefined {
+    return this.paperDataMap.get(docId)?.conversationSummary;
+  }
+
+  /** History + rolling summary payload for /api/ask. */
+  getAskContext(docId: string): {
+    history: ElowenAnswer[];
+    conversationSummary?: string;
+  } {
+    const all = this.getConversationHistory(docId, 100);
+    const paper = this.getPaperData(docId);
+    const through = Math.max(0, paper?.conversationSummaryThrough ?? 0);
+    // Always include at least the last 4 raw turns; skip older ones already
+    // represented in the rolling summary.
+    const keepRaw = 4;
+    const start = Math.min(through, Math.max(0, all.length - keepRaw));
+    return {
+      history: all.slice(start).slice(-24),
+      conversationSummary: paper?.conversationSummary,
+    };
+  }
+
+  setConversationSummary(
+    docId: string,
+    summary: string,
+    summarizedThrough?: number
+  ) {
+    const existing = this.getPaperData(docId);
+    if (!existing) return;
+    const updated: PaperData = {
+      ...existing,
+      conversationSummary: summary,
+      ...(summarizedThrough !== undefined
+        ? { conversationSummaryThrough: summarizedThrough }
+        : {}),
+    };
+    this.paperDataMap.set(docId, updated);
+    this.persistPaperNow(docId, updated);
+  }
+
+  /**
+   * Persist a new answer and optionally a refreshed conversation summary
+   * returned by the ask API after server-side compression.
+   */
+  addAnswerFromResponse(
+    docId: string,
+    response: ElowenAnswer & { conversationSummary?: string }
+  ) {
+    const priorCount = this.getAnswers(docId).filter((a) => !a.isLoading).length;
+    const { conversationSummary, ...answer } = response;
+    this.addAnswer(docId, answer as ElowenAnswer);
+    if (typeof conversationSummary === "string" && conversationSummary.trim()) {
+      const through = priorCount > 4 ? priorCount - 4 : priorCount;
+      this.setConversationSummary(docId, conversationSummary.trim(), through);
+    }
   }
 
   getAnnotations(docId: string): UserAnnotation[] {
@@ -151,26 +249,11 @@ export class HistoryService extends Service {
   }
 
   getPaperData(docId: string): PaperData | null {
-    const key = `${PAPER_KEY_PREFIX}${docId}`;
-    return this.sp.localStorageService.getData<PaperData | null>(key, null);
+    return this.paperDataMap.get(docId) ?? null;
   }
 
-  /**
-   * Retrieves all paper data from local storage.
-   * @returns An array of PaperData objects.
-   */
   getPaperHistory(sortByTimestamp = true): PaperData[] {
-    const paperKeys = this.sp.localStorageService.listKeys(PAPER_KEY_PREFIX);
-    const papers: PaperData[] = [];
-    for (const key of paperKeys) {
-      const paperData = this.sp.localStorageService.getData<PaperData | null>(
-        key,
-        null
-      );
-      if (paperData) {
-        papers.push(paperData);
-      }
-    }
+    const papers = [...this.paperDataMap.values()];
     if (sortByTimestamp) {
       return sortPaperDataByTimestamp(papers);
     }
@@ -192,12 +275,6 @@ export class HistoryService extends Service {
     }
   }
 
-  /**
-   * Adds a new answer to the history for a given document ID.
-   * Answers are prepended to the array to keep the most recent first.
-   * @param docId The ID of the document.
-   * @param answer The ElowenAnswer object to add.
-   */
   addAnswer(docId: string, answer: ElowenAnswer) {
     const currentAnswers = this.getAnswers(docId);
     this.answers.set(docId, [answer, ...currentAnswers]);
@@ -205,13 +282,9 @@ export class HistoryService extends Service {
     this.historyCollapseManager.setAnswerCollapsed(answer.id, false);
 
     this.updateAnswerSpansMap(answer);
-    this.syncPaperToLocalStorage(docId);
+    this.syncPaper(docId);
   }
 
-  /**
-   * Removes an answer from history for a given document ID.
-   * Also clears associated highlights and temporary entries if present.
-   */
   removeAnswer(docId: string, answerId: string) {
     const currentAnswers = this.getAnswers(docId);
     const nextAnswers = currentAnswers.filter(
@@ -222,18 +295,12 @@ export class HistoryService extends Service {
       this.answers.set(docId, nextAnswers);
       this.answerHighlightManager.removeAnswer(answerId);
       this.removeAnswerSpansMap(answerId);
-      this.syncPaperToLocalStorage(docId);
+      this.syncPaper(docId);
     }
 
     this.removeTemporaryAnswer(answerId);
   }
 
-  /**
-   * Adds a new temporary answer for a given document ID.
-   * @param docId The ID of the document.
-   * @param answer The temporary ElowenAnswer object to add.
-   * @param collapseOthers Whether to collapse other answers.
-   */
   addTemporaryAnswer(answer: ElowenAnswer, collapseOthers = true) {
     this.temporaryAnswers.push(answer);
 
@@ -243,11 +310,6 @@ export class HistoryService extends Service {
     }
   }
 
-  /**
-   * Removes a temporary answer for a given document ID.
-   * @param docId The ID of the document.
-   * @param answerId The ID of the temporary ElowenAnswer object to remove.
-   */
   removeTemporaryAnswer(answerId: string) {
     const answerIndex = this.temporaryAnswers.findIndex(
       (answer) => answer.id === answerId
@@ -257,37 +319,24 @@ export class HistoryService extends Service {
     }
   }
 
-  /**
-   * Retrieves the temporary answer history for a given document ID.
-   * @param docId The ID of the document.
-   * @returns An array of ElowenAnswer objects, or an empty array if none exist.
-   */
   getTemporaryAnswers(): ElowenAnswer[] {
     return this.temporaryAnswers;
   }
 
-  /**
-   * Clears all temporary answers.
-   */
   clearTemporaryAnswers() {
     this.temporaryAnswers = [];
   }
 
-  /**
-   * Adds a new personal summary for a given document ID.
-   * @param docId The ID of the document.
-   * @param summary The ElowenAnswer object to add.
-   */
   addPersonalSummary(docId: string, summary: ElowenAnswer) {
     this.personalSummaries.set(docId, summary);
-    this.syncPaperToLocalStorage(docId);
+    this.syncPaper(docId);
   }
 
   addAnnotation(docId: string, annotation: UserAnnotation) {
     const currentAnnotations = this.getAnnotations(docId);
     this.annotations.set(docId, [annotation, ...currentAnnotations]);
     this.userHighlightManager.addAnnotation(annotation);
-    this.syncPaperToLocalStorage(docId);
+    this.syncPaper(docId);
   }
 
   updateAnnotation(docId: string, annotation: UserAnnotation) {
@@ -299,7 +348,7 @@ export class HistoryService extends Service {
       )
     );
     this.userHighlightManager.updateAnnotation(annotation);
-    this.syncPaperToLocalStorage(docId);
+    this.syncPaper(docId);
   }
 
   removeAnnotation(docId: string, annotationId: string) {
@@ -309,14 +358,9 @@ export class HistoryService extends Service {
       currentAnnotations.filter((item) => item.id !== annotationId)
     );
     this.userHighlightManager.removeAnnotation(annotationId);
-    this.syncPaperToLocalStorage(docId);
+    this.syncPaper(docId);
   }
 
-  /**
-   * Adds a paper with 'loading' status.
-   * @param docId The ID of the document.
-   * @param metadata The metadata of the paper.
-   */
   addLoadingPaper(docId: string, metadata: ArxivMetadata) {
     if (this.paperMetadata.has(docId)) {
       return;
@@ -328,27 +372,21 @@ export class HistoryService extends Service {
       status: "loading",
       addedTimestamp: Date.now(),
     };
-    this.sp.localStorageService.setData(
-      `${PAPER_KEY_PREFIX}${docId}`,
-      newPaper
-    );
+    this.paperDataMap.set(docId, newPaper);
+    this.persistPaperNow(docId, newPaper);
   }
 
-  /**
-   * Adds a paper to the history or updates its status to 'complete'.
-   * @param docId The ID of the document.
-   * @param metadata The metadata of the paper.
-   */
   addPaper(docId: string, metadata: ArxivMetadata) {
-    // If the paper already exists (i.e., it was a loading paper),
-    // we just update its status. Otherwise, we create a new entry.
     const existingPaper = this.getPaperData(docId);
     if (existingPaper) {
-      existingPaper.status = "complete";
-      this.sp.localStorageService.setData(
-        `${PAPER_KEY_PREFIX}${docId}`,
-        existingPaper
-      );
+      const updated: PaperData = {
+        ...existingPaper,
+        metadata,
+        status: "complete",
+      };
+      this.paperDataMap.set(docId, updated);
+      this.paperMetadata.set(docId, metadata);
+      this.persistPaperNow(docId, updated);
     } else {
       this.paperMetadata.set(docId, metadata);
       const newPaper: PaperData = {
@@ -357,17 +395,11 @@ export class HistoryService extends Service {
         status: "complete",
         addedTimestamp: Date.now(),
       };
-      this.sp.localStorageService.setData(
-        `${PAPER_KEY_PREFIX}${docId}`,
-        newPaper
-      );
+      this.paperDataMap.set(docId, newPaper);
+      this.persistPaperNow(docId, newPaper);
     }
   }
 
-  /**
-   * Deletes a paper and its history.
-   * @param docId The ID of the document to delete.
-   */
   deletePaper(docId: string) {
     for (const answer of this.getAnswers(docId)) {
       this.answerHighlightManager.removeAnswer(answer.id);
@@ -380,17 +412,23 @@ export class HistoryService extends Service {
     this.answers.delete(docId);
     this.personalSummaries.delete(docId);
     this.annotations.delete(docId);
-    this.sp.localStorageService.deleteData(`${PAPER_KEY_PREFIX}${docId}`);
+    this.paperDataMap.delete(docId);
+    const timer = this.saveTimers.get(docId);
+    if (timer) {
+      clearTimeout(timer);
+      this.saveTimers.delete(docId);
+    }
+    void httpApi.deleteLibraryPaper(docId).catch((e) => {
+      console.warn(`Failed to delete library paper ${docId}`, e);
+    });
   }
 
-  /**
-   * Clears all paper history from memory and local storage.
-   */
   clearAllHistory() {
-    const paperKeys = this.sp.localStorageService.listKeys(PAPER_KEY_PREFIX);
-    for (const key of paperKeys) {
-      this.sp.localStorageService.deleteData(key);
+    for (const timer of this.saveTimers.values()) {
+      clearTimeout(timer);
     }
+    this.saveTimers.clear();
+    this.paperDataMap.clear();
     this.paperMetadata.clear();
     this.answers.clear();
     this.personalSummaries.clear();
@@ -398,34 +436,97 @@ export class HistoryService extends Service {
     this.answerHighlightManager.clearHighlights();
     this.userHighlightManager.clearHighlights();
     this.spanIdToAnswerIdMap.clear();
+    void httpApi.clearLibrary().catch((e) => {
+      console.warn("Failed to clear library", e);
+    });
   }
 
-  /**
-   * Retrieves the Answer ID for a given Span ID.
-   * @param spanId The ID of the span.
-   * @returns The Answer ID if found, otherwise undefined.
-   */
   getAnswerIdForSpan(spanId: string): string | undefined {
     return this.spanIdToAnswerIdMap.get(spanId);
   }
 
-  private syncPaperToLocalStorage(docId: string) {
-    const paperData = this.getPaperData(docId);
-    if (!paperData) {
-      console.warn(`Attempted to sync paper that does not exist: ${docId}`);
-      return;
+  private syncPaper(docId: string) {
+    let existing = this.getPaperData(docId);
+    if (!existing) {
+      const metadata = this.paperMetadata.get(docId);
+      if (!metadata) {
+        console.warn(`Attempted to sync paper that does not exist: ${docId}`);
+        return;
+      }
+      existing = {
+        metadata,
+        history: [],
+        status: "complete",
+        addedTimestamp: Date.now(),
+      };
     }
 
     const updatedPaperData: PaperData = {
-      ...paperData,
+      ...existing,
       history: this.getAnswers(docId),
       personalSummary: this.personalSummaries.get(docId),
       annotations: this.getAnnotations(docId),
     };
+    this.paperDataMap.set(docId, updatedPaperData);
 
-    this.sp.localStorageService.setData(
-      `${PAPER_KEY_PREFIX}${docId}`,
-      updatedPaperData
-    );
+    if (this.persistSuspended) return;
+    // Persist Q&A immediately so refresh does not lose the latest turn.
+    const prev = this.saveTimers.get(docId);
+    if (prev) clearTimeout(prev);
+    this.saveTimers.delete(docId);
+    this.persistPaperNow(docId, updatedPaperData);
+  }
+
+  private persistPaperNow(docId: string, data: PaperData) {
+    if (this.persistSuspended) return;
+    void httpApi.putLibraryPaper(docId, data).catch((e) => {
+      console.warn(`Failed to save library paper ${docId}`, e);
+    });
+  }
+
+  /** Flush any deferred saves (kept for compatibility; sync is now immediate). */
+  flushPendingSaves() {
+    for (const [docId, timer] of this.saveTimers.entries()) {
+      clearTimeout(timer);
+      const data = this.paperDataMap.get(docId);
+      if (data) this.persistPaperNow(docId, data);
+      this.saveTimers.delete(docId);
+    }
+  }
+
+  private readLegacyBrowserPapers(): PaperData[] {
+    const papers: PaperData[] = [];
+    try {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (!key || !key.startsWith(LEGACY_PAPER_KEY_PREFIX)) continue;
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        try {
+          const paper = JSON.parse(raw) as PaperData;
+          if (paper?.metadata?.paperId) papers.push(paper);
+        } catch {
+          // skip bad entry
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return papers;
+  }
+
+  private clearLegacyBrowserPapers() {
+    try {
+      const keys: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith(LEGACY_PAPER_KEY_PREFIX)) keys.push(key);
+      }
+      for (const key of keys) {
+        window.localStorage.removeItem(key);
+      }
+    } catch {
+      // ignore
+    }
   }
 }

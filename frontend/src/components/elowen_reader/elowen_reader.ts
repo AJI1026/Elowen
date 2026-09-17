@@ -25,6 +25,7 @@ import "../../pair-components/icon_button";
 import { CSSResultGroup, html, nothing, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { provide } from "@lit/context";
+import { reaction } from "mobx";
 
 import { core } from "../../core/core";
 import { ApiService } from "../../services/api.service";
@@ -52,6 +53,7 @@ import {
   FootnoteTooltipProps,
   ReferenceTooltipProps,
   SmartHighlightMenuProps,
+  TranslateTooltipProps,
   UserAnnotationTooltipProps,
 } from "../../services/floating_panel_service";
 import { ImageInfo, ElowenAnswer, ElowenAnswerRequest } from "../../shared/api";
@@ -61,10 +63,14 @@ import { UserAnnotation } from "../../shared/types_local_storage";
 import { styles } from "./elowen_reader.scss";
 
 import {
+  characterElementFromEvent,
   getSelectionInfo,
+  getWordAtCharacterElement,
+  getWordCharElements,
   HighlightSelection,
   normalizeSelectionText,
   SelectionInfo,
+  shouldSkipWordTranslate,
 } from "../../shared/selection_utils";
 import { createTemporaryAnswer } from "../../shared/answer_utils";
 import { classMap } from "lit/directives/class-map.js";
@@ -107,6 +113,12 @@ const LOADING_STATES_RENDER_ERROR: string[] = [
 
 const TUTORIAL_DIALOG_DELAY = 800;
 
+/** Class applied to the character spans of the word under the pointer. */
+const WORD_HOVER_CLASS = "word-hover";
+
+/** Grace period used to tell a word click apart from a double-click select. */
+const DOUBLE_CLICK_GRACE_MS = 220;
+
 /**
  * The component responsible for fetching a single document and passing it
  * to the elowen-doc component.
@@ -137,6 +149,10 @@ export class ElowenReader extends LightMobxLitElement {
   @state() hoveredSpanId: string | null = null;
 
   private mobileSmartHighlightContainerRef = createRef<HTMLElement>();
+  private docPointerDown = { x: 0, y: 0 };
+  private hoveredWordElements: HTMLElement[] = [];
+  private pendingTranslateTimer: number | undefined;
+  private disposePanelReaction: () => void = () => {};
 
   private unsubscribeListener?: () => void;
 
@@ -148,20 +164,39 @@ export class ElowenReader extends LightMobxLitElement {
       this.loadDocument();
     }
 
-    document.onselectionchange = () => {
-      const selection = window.getSelection();
-
-      if (!selection) return;
-
-      const selectionInfo = getSelectionInfo(selection);
-
-      if (selectionInfo) {
-        this.handleTextSelection(selectionInfo);
-      }
-    };
-
+    document.addEventListener("selectionchange", this.handleSelectionChange);
     document.addEventListener("copy", this.handlePaperCopy);
+    document.addEventListener(
+      "pointerdown",
+      this.handleDocumentPointerDownCapture,
+      true
+    );
+    document.addEventListener("click", this.handleDocumentClickCapture, true);
+    document.addEventListener(
+      "dblclick",
+      this.handleDocumentDblClickCapture,
+      true
+    );
+
+    this.disposePanelReaction = reaction(
+      () => this.floatingPanelService.isVisible,
+      (visible) => {
+        if (!visible) {
+          this.documentStateService.highlightManager?.clearHighlights();
+        }
+      }
+    );
   }
+
+  private readonly handleSelectionChange = () => {
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    const selectionInfo = getSelectionInfo(selection);
+    if (selectionInfo) {
+      this.handleTextSelection(selectionInfo);
+    }
+  };
 
   private readonly handlePaperCopy = (event: ClipboardEvent) => {
     const selection = window.getSelection();
@@ -209,8 +244,27 @@ export class ElowenReader extends LightMobxLitElement {
   }
 
   override disconnectedCallback() {
+    this.disposePanelReaction();
     this.bannerService.clearBannerProperties();
+    this.floatingPanelService.hide();
+    document.removeEventListener("selectionchange", this.handleSelectionChange);
     document.removeEventListener("copy", this.handlePaperCopy);
+    document.removeEventListener(
+      "pointerdown",
+      this.handleDocumentPointerDownCapture,
+      true
+    );
+    document.removeEventListener(
+      "click",
+      this.handleDocumentClickCapture,
+      true
+    );
+    document.removeEventListener(
+      "dblclick",
+      this.handleDocumentDblClickCapture,
+      true
+    );
+    this.cancelPendingTranslate();
 
     super.disconnectedCallback();
     if (this.unsubscribeListener) {
@@ -383,13 +437,16 @@ export class ElowenReader extends LightMobxLitElement {
     this.checkChangeTabs();
 
     try {
+      const askContext = this.historyService.getAskContext(this.documentId);
       const response = await getElowenResponseCallable(
         null,
         this.documentStateService.elowenDocManager.elowenDoc,
         request,
-        this.settingsService.getModelConfig()
+        this.settingsService.getModelConfig(),
+        askContext.history,
+        askContext.conversationSummary
       );
-      this.historyService.addAnswer(this.documentId, response);
+      this.historyService.addAnswerFromResponse(this.documentId, response);
     } catch (e) {
       const lang = this.settingsService.responseLanguage.value;
       let message = t("ask.errorResponse", lang);
@@ -407,6 +464,126 @@ export class ElowenReader extends LightMobxLitElement {
     } finally {
       this.historyService.removeTemporaryAnswer(tempAnswer.id);
     }
+  };
+
+  private readonly handleTranslate = (
+    text: string,
+    highlightedSpans: HighlightSelection[],
+    target: HTMLElement
+  ) => {
+    if (!text.trim()) return;
+
+    this.analyticsService.trackAction(AnalyticsAction.READER_WORD_TRANSLATE);
+    this.floatingPanelService.show(
+      new TranslateTooltipProps(text, highlightedSpans),
+      target
+    );
+  };
+
+  private readonly handleDocMouseDown = () => {
+    this.clearWordHover();
+    this.clearHighlightsAndMenus();
+  };
+
+  /**
+   * Paper content stops click propagation, so listen in the capture phase.
+   * Mirrors Semantic Reader / ScholarPhi: click a word, get a compact popup.
+   */
+  private readonly handleDocumentPointerDownCapture = (event: PointerEvent) => {
+    this.docPointerDown = { x: event.clientX, y: event.clientY };
+  };
+
+  private readonly handleDocumentClickCapture = (event: MouseEvent) => {
+    if (event.detail !== 1) return;
+
+    const inDoc = event
+      .composedPath()
+      .some(
+        (node) =>
+          node instanceof HTMLElement &&
+          node.classList.contains("doc-wrapper")
+      );
+    if (!inDoc) return;
+
+    // Ignore the click that ends a drag-selection.
+    const dx = event.clientX - this.docPointerDown.x;
+    const dy = event.clientY - this.docPointerDown.y;
+    if (dx * dx + dy * dy > 36) return;
+
+    const charEl = characterElementFromEvent(event);
+    this.cancelPendingTranslate();
+    if (!charEl) {
+      this.clearHighlightsAndMenus();
+      return;
+    }
+    if (shouldSkipWordTranslate(charEl)) return;
+
+    const word = getWordAtCharacterElement(charEl);
+    if (!word) return;
+
+    this.scheduleTranslate(word);
+  };
+
+  /**
+   * Delay a word look-up briefly so double-clicking to select a word does not
+   * fire a translation request that is immediately superseded by the menu.
+   */
+  private scheduleTranslate(word: SelectionInfo) {
+    if (this.pendingTranslateTimer !== undefined) {
+      window.clearTimeout(this.pendingTranslateTimer);
+    }
+    this.pendingTranslateTimer = window.setTimeout(() => {
+      this.pendingTranslateTimer = undefined;
+      this.handleTranslate(
+        word.selectedText,
+        word.highlightSelection,
+        word.parentSpan
+      );
+    }, DOUBLE_CLICK_GRACE_MS);
+  }
+
+  private readonly handleDocumentDblClickCapture = () => {
+    this.cancelPendingTranslate();
+  };
+
+  private cancelPendingTranslate() {
+    if (this.pendingTranslateTimer !== undefined) {
+      window.clearTimeout(this.pendingTranslateTimer);
+      this.pendingTranslateTimer = undefined;
+    }
+  }
+
+  /**
+   * Hovering a word highlights the whole word so readers can tell that
+   * look-up is available (same affordance as Readlang / Zeeguu).
+   */
+  private readonly handleDocMouseOver = (event: MouseEvent) => {
+    const charEl = characterElementFromEvent(event);
+    if (!charEl || shouldSkipWordTranslate(charEl)) {
+      this.clearWordHover();
+      return;
+    }
+
+    const elements = getWordCharElements(charEl);
+    if (
+      elements.length === this.hoveredWordElements.length &&
+      elements[0] === this.hoveredWordElements[0]
+    ) {
+      return;
+    }
+
+    this.clearWordHover();
+    this.hoveredWordElements = elements;
+    for (const element of elements) {
+      element.classList.add(WORD_HOVER_CLASS);
+    }
+  };
+
+  private clearWordHover = () => {
+    for (const element of this.hoveredWordElements) {
+      element.classList.remove(WORD_HOVER_CLASS);
+    }
+    this.hoveredWordElements = [];
   };
 
   private readonly handleAsk = async (
@@ -431,13 +608,16 @@ export class ElowenReader extends LightMobxLitElement {
     this.historyService.addTemporaryAnswer(tempAnswer);
 
     try {
+      const askContext = this.historyService.getAskContext(this.documentId);
       const response = await getElowenResponseCallable(
         null,
         currentDoc,
         request,
-        this.settingsService.getModelConfig()
+        this.settingsService.getModelConfig(),
+        askContext.history,
+        askContext.conversationSummary
       );
-      this.historyService.addAnswer(this.documentId, response);
+      this.historyService.addAnswerFromResponse(this.documentId, response);
     } catch (e) {
       console.error("Error getting Elowen response:", e);
       this.snackbarService.show(
@@ -478,13 +658,16 @@ export class ElowenReader extends LightMobxLitElement {
     this.historyService.addTemporaryAnswer(tempAnswer);
 
     try {
+      const askContext = this.historyService.getAskContext(this.documentId);
       const response = await getElowenResponseCallable(
         null,
         currentDoc,
         request,
-        this.settingsService.getModelConfig()
+        this.settingsService.getModelConfig(),
+        askContext.history,
+        askContext.conversationSummary
       );
-      this.historyService.addAnswer(this.documentId, response);
+      this.historyService.addAnswerFromResponse(this.documentId, response);
     } catch (e) {
       console.error("Error getting Elowen mindmap:", e);
       this.snackbarService.show(
@@ -513,8 +696,9 @@ export class ElowenReader extends LightMobxLitElement {
     if (this.floatingPanelService.isVisible) {
       this.floatingPanelService.hide();
     }
-
+    this.documentStateService.highlightManager?.clearHighlights();
     this.hoveredSpanId = null;
+    this.clearWordHover();
   };
 
   private readonly handleTextSelection = (selectionInfo: SelectionInfo) => {
@@ -770,9 +954,9 @@ export class ElowenReader extends LightMobxLitElement {
       </div>
       <div
         class="doc-wrapper"
-        @mousedown=${() => {
-          this.clearHighlightsAndMenus();
-        }}
+        @mousedown=${this.handleDocMouseDown}
+        @mouseover=${this.handleDocMouseOver}
+        @mouseleave=${this.clearWordHover}
       >
         <elowen-doc
           .elowenDocManager=${this.documentStateService.elowenDocManager}

@@ -72,15 +72,25 @@ export class HomeService extends Service {
     );
     if (this.currentCollection) {
       // Load papers for current collection
-      this.loadMetadata(this.currentCollection?.paperIds ?? []);
+      void this.loadMetadata(this.currentCollection?.paperIds ?? []);
     } else {
-      // Otherwise, load for local storage collection
-      this.loadMetadata(
+      // Home / "My collection": load covers for library papers
+      void this.loadMetadata(
         this.sp.historyService
           .getPaperHistory()
           .map((item) => item.metadata?.paperId)
       );
     }
+  }
+
+  /** Reload featured images for the current local library (e.g. after import). */
+  reloadLocalLibraryMetadata(forceReload = false) {
+    void this.loadMetadata(
+      this.sp.historyService
+        .getPaperHistory()
+        .map((item) => item.metadata?.paperId),
+      forceReload
+    );
   }
 
   get currentCollectionId() {
@@ -122,7 +132,11 @@ export class HomeService extends Service {
    */
   async loadMetadata(paperIds: string[], forceReload = false) {
     for (const paperId of paperIds) {
-      if (!paperId || (this.paperToMetadataMap.get(paperId) && !forceReload)) {
+      if (!paperId) continue;
+      // Refetch when we have metadata but still lack a featured image cover.
+      const hasMeta = this.paperToMetadataMap.has(paperId);
+      const hasCover = this.paperToFeaturedImageMap.has(paperId);
+      if (hasMeta && hasCover && !forceReload) {
         continue;
       }
       try {

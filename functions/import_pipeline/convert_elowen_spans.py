@@ -25,7 +25,10 @@ from shared.elowen_doc import (
 )
 from shared.utils import get_unique_id
 from import_pipeline.tokenize import tokenize_sentences
-from import_pipeline.markdown_utils import postprocess_content_text
+from import_pipeline.markdown_utils import (
+    postprocess_content_text,
+    sanitize_unresolved_latex,
+)
 
 
 def parse_text_and_extract_inner_tags(raw_content: str) -> (str, List[InnerTag]):
@@ -34,6 +37,8 @@ def parse_text_and_extract_inner_tags(raw_content: str) -> (str, List[InnerTag])
     This function is recursive to handle nested tags. The content of tags is
     also parsed, and any inner tags found are added as children to the parent tag.
     """
+    raw_content = sanitize_unresolved_latex(raw_content)
+
     cleaned_text_content = ""
     inner_tags = []
     current_position_raw = 0

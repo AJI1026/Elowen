@@ -42,7 +42,7 @@ class ElowenAnswerRequest:
     highlight: Optional[str] = None
     highlighted_spans: Optional[List[HighlightSelection]] = None
     image: Optional[ImageInfo] = None
-    # "mindmap" requests a nested logic map instead of a short prose answer.
+    # "mindmap" = nested logic map; "translate" = translate the highlight.
     response_mode: Optional[str] = None
 
 

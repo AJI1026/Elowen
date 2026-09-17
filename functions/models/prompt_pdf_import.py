@@ -69,7 +69,7 @@ Do not include anything from the Appendix section.
 
 {PDF_IMPORT_FORMATTING_INSTRUCTIONS}
 
-Make sure that the content is accurate to the pdf bytes and does NOT include any latex syntax outside of the $equations$.
+Make sure that the content is accurate to the pdf bytes and does NOT include any latex syntax outside of the $equations$. Convert cross-references such as `Fig.~\\ref{{fig:teaser}}` or `Eq.~\\ref{{eq:1}}` into the readable form from the PDF (e.g. "Fig. 1", "Eq. 2").
 
 Your output should look something like: 
 

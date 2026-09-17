@@ -122,13 +122,16 @@ export class ElowenQuestions extends LightMobxLitElement {
     const queryToClear = this.query;
 
     try {
+      const askContext = this.historyService.getAskContext(docId);
       const response = await getElowenResponseCallable(
         null,
         elowenDoc,
         request,
-        this.settingsService.getModelConfig()
+        this.settingsService.getModelConfig(),
+        askContext.history,
+        askContext.conversationSummary
       );
-      this.historyService.addAnswer(docId, response);
+      this.historyService.addAnswerFromResponse(docId, response);
       this.query = "";
     } catch (e) {
       console.error("Error getting Elowen response:", e);
@@ -163,13 +166,16 @@ export class ElowenQuestions extends LightMobxLitElement {
     this.historyService.addTemporaryAnswer(tempAnswer);
 
     try {
+      const askContext = this.historyService.getAskContext(docId);
       const response = await getElowenResponseCallable(
         null,
         elowenDoc,
         request,
-        this.settingsService.getModelConfig()
+        this.settingsService.getModelConfig(),
+        askContext.history,
+        askContext.conversationSummary
       );
-      this.historyService.addAnswer(docId, response);
+      this.historyService.addAnswerFromResponse(docId, response);
     } catch (e) {
       console.error("Error getting Elowen mindmap:", e);
       this.snackbarService.show(

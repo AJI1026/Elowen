@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from . import repository as repo
 from . import services
 from . import session as db_session
+from . import user_settings
 from .config import AUTO_SEED, IMAGES_DIR, STATIC_DIR, ensure_data_dirs
 from .functions_bootstrap import bootstrap_functions_path
 from .seed import seed_if_empty
@@ -59,6 +60,10 @@ class AskRequest(BaseModel):
     request: dict[str, Any]
     modelConfig: dict[str, Any] | None = None
     apiKey: str | None = None
+    # Prior Q&A on this paper (oldest first), for multi-turn context.
+    history: list[dict[str, Any]] = Field(default_factory=list)
+    # Rolling summary of older turns (optional; produced by previous asks).
+    conversationSummary: str | None = None
 
 
 class PersonalSummaryRequest(BaseModel):
@@ -73,14 +78,63 @@ class FeedbackRequest(BaseModel):
     arxiv_id: str | None = None
 
 
+class SettingsUpdate(BaseModel):
+    modelProvider: str | None = None
+    providerSettings: dict[str, Any] | None = None
+    responseLanguage: str | None = None
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/settings")
+def get_settings() -> dict[str, Any]:
+    """Read model config from data/settings.json."""
+    return user_settings.load_settings()
+
+
+@app.put("/api/settings")
+def put_settings(body: SettingsUpdate) -> dict[str, Any]:
+    """Persist model config to data/settings.json."""
+    payload = body.model_dump(exclude_none=True)
+    return user_settings.save_settings(payload)
+
+
 @app.get("/api/collections")
 def get_collections(session: Session = Depends(get_session)) -> list[dict]:
     return repo.list_collections(session)
+
+
+@app.get("/api/library")
+def get_library(session: Session = Depends(get_session)) -> list[dict]:
+    """User's loaded papers (PaperData), persisted in SQLite under data/."""
+    return repo.list_library(session)
+
+
+@app.put("/api/library/{paper_id}")
+def put_library_paper(
+    paper_id: str, body: dict[str, Any], session: Session = Depends(get_session)
+) -> dict:
+    try:
+        return repo.upsert_library_paper(session, paper_id, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.delete("/api/library/{paper_id}")
+def delete_library_paper(
+    paper_id: str, session: Session = Depends(get_session)
+) -> dict[str, str]:
+    repo.delete_library_paper(session, paper_id)
+    return {"status": "ok"}
+
+
+@app.delete("/api/library")
+def clear_library(session: Session = Depends(get_session)) -> dict[str, str]:
+    repo.clear_library(session)
+    return {"status": "ok"}
 
 
 @app.get("/api/papers/{paper_id}/metadata-item")
@@ -153,7 +207,12 @@ def import_paper(
 def ask(body: AskRequest) -> dict:
     try:
         return services.generate_answer(
-            body.doc, body.request, body.modelConfig, body.apiKey
+            body.doc,
+            body.request,
+            body.modelConfig,
+            body.apiKey,
+            body.history,
+            body.conversationSummary,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

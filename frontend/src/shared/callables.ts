@@ -45,18 +45,24 @@ export const requestArxivDocImportCallable = async (
 
 /**
  * Requests a Elowen answer based on the document and user input.
+ * Pass ``history`` (oldest→newest prior answers on this paper) for multi-turn context.
+ * Long histories are summarized server-side; ``conversationSummary`` is a rolling cache.
  */
 export const getElowenResponseCallable = async (
   _functions: unknown,
   doc: ElowenDoc,
   request: ElowenAnswerRequest,
-  modelConfig: ModelConfig
-): Promise<ElowenAnswer> => {
+  modelConfig: ModelConfig,
+  history: ElowenAnswer[] = [],
+  conversationSummary?: string
+): Promise<ElowenAnswer & { conversationSummary?: string }> => {
   return httpApi.ask({
     doc,
     request,
     modelConfig,
     apiKey: modelConfig.apiKey,
+    history,
+    conversationSummary,
   });
 };
 

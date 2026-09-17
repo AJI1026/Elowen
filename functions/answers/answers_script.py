@@ -109,7 +109,7 @@ def main():
     request = ElowenAnswerRequest(query=args.query, highlight=args.highlight)
 
     print("Generating answer...")
-    elowen_answer = generate_elowen_answer(doc, request)
+    elowen_answer, _summary = generate_elowen_answer(doc, request)
 
     print("\n" + "=" * 20 + " RESULT " + "=" * 20)
     print(f"Request Query: {elowen_answer.request.query}")

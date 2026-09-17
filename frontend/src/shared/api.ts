@@ -24,14 +24,14 @@ export interface ImageInfo {
 }
 
 // Kept in sync with: functions/shared/api.py
-export type ElowenAnswerResponseMode = "mindmap";
+export type ElowenAnswerResponseMode = "mindmap" | "translate";
 
 export interface ElowenAnswerRequest {
   query?: string;
   highlight?: string;
   highlightedSpans?: HighlightSelection[];
   image?: ImageInfo;
-  /** "mindmap" requests a nested logic map instead of short prose. */
+  /** "mindmap" = nested logic map; "translate" = translate the highlight. */
   responseMode?: ElowenAnswerResponseMode;
 }
 

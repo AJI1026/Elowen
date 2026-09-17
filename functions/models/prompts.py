@@ -7,6 +7,7 @@ from .prompt_answers import (
     ELOWEN_PROMPT_DEFINE_IMAGE,
     ELOWEN_PROMPT_MINDMAP,
     ELOWEN_PROMPT_MINDMAP_WITH_CONTEXT,
+    ELOWEN_PROMPT_TRANSLATE,
     _ELOWEN_ANSWER_BASE_PROMPT,
 )
 from .prompt_concept_extraction import (
@@ -31,6 +32,7 @@ __all__ = [
     "ELOWEN_PROMPT_ANSWER_WITH_CONTEXT",
     "ELOWEN_PROMPT_MINDMAP",
     "ELOWEN_PROMPT_MINDMAP_WITH_CONTEXT",
+    "ELOWEN_PROMPT_TRANSLATE",
     "_ELOWEN_ANSWER_BASE_PROMPT",
     "CONCEPT_EXTRACTION_PROMPT",
     "make_concept_extraction_prompt",

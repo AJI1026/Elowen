@@ -87,6 +87,19 @@ export class ConceptTooltipProps extends FloatingPanelContentProps {
   }
 }
 
+/** Props for the in-place translation popup. */
+export class TranslateTooltipProps extends FloatingPanelContentProps {
+  constructor(
+    public selectedText: string,
+    public highlightedSpans: HighlightSelection[]
+  ) {
+    super();
+    // Sit directly beneath the clicked word (ScholarPhi / Semantic Reader style).
+    this.anchorCorner = "start-end";
+    this.menuCorner = "start-start";
+  }
+}
+
 /** Props for the FootnoteTooltip component. */
 export class FootnoteTooltipProps extends FloatingPanelContentProps {
   constructor(public footnote: ElowenFootnote) {

@@ -43,6 +43,7 @@ import { AnswerHighlightManager } from "../../shared/answer_highlight_manager";
 import { ElowenAnswer } from "../../shared/api";
 import { UserAnnotation } from "../../shared/types_local_storage";
 import { flattenTags } from "./elowen_span_utils";
+import { sanitizeUnresolvedLatex } from "../../shared/string_utils";
 
 import { styles } from "./elowen_span.scss";
 import { LightMobxLitElement } from "../light_mobx_lit_element/light_mobx_lit_element";
@@ -121,25 +122,13 @@ export class ElowenSpanViz extends LightMobxLitElement {
 
   @state() private renderedContent: TemplateResult | null = null;
 
-  override firstUpdated(_changedProperties: PropertyValues): void {
-    this.id = this.span.id;
-  }
+  protected override willUpdate(changedProperties: PropertyValues): void {
+    super.willUpdate(changedProperties);
 
-  override connectedCallback() {
-    super.connectedCallback();
-
-    if (this.noScrollContext) return;
-
-    this.updateComplete.then(() => {
-      if (this.spanRef.value && this.span) {
-        this.scrollContext?.registerSpan(this.span.id, this.spanRef);
-      }
-    });
-  }
-
-  override updated(changedProperties: PropertyValues) {
-    super.updated(changedProperties);
-
+    // Compute the characters/insertions that `render()` consumes here rather
+    // than in `updated()`. Lit's update is still flagged as pending during
+    // `willUpdate`, so writing the `renderedContent` state does not schedule a
+    // second update (which would trigger the "change-in-update" warning).
     const hasHighlightChanges =
       changedProperties.has("highlights") &&
       this.highlights &&
@@ -157,6 +146,22 @@ export class ElowenSpanViz extends LightMobxLitElement {
     ) {
       this.calculateRenderedContent();
     }
+  }
+
+  override firstUpdated(_changedProperties: PropertyValues): void {
+    this.id = this.span.id;
+  }
+
+  override connectedCallback() {
+    super.connectedCallback();
+
+    if (this.noScrollContext) return;
+
+    this.updateComplete.then(() => {
+      if (this.spanRef.value && this.span) {
+        this.scrollContext?.registerSpan(this.span.id, this.spanRef);
+      }
+    });
   }
 
   override disconnectedCallback() {
@@ -435,7 +440,7 @@ export class ElowenSpanViz extends LightMobxLitElement {
     }
 
     const allHighlights = [...highlights];
-    const spanText = span.text;
+    const spanText = sanitizeUnresolvedLatex(span.text);
     const hasHighlight = highlights.length > 0;
 
     const allInnerTags = flattenTags(span.innerTags || []);
@@ -452,7 +457,7 @@ export class ElowenSpanViz extends LightMobxLitElement {
     // we can just return the plain text.
     if (!hasHighlight && !allInnerTags.length && insertions.size === 0) {
       this.renderedContent = html`<span class=${classMap(spanClasses)}>
-        ${this.renderNonformattedCharacters(span.text)}
+        ${this.renderNonformattedCharacters(sanitizeUnresolvedLatex(span.text))}
       </span>`;
       return;
     }
@@ -582,7 +587,7 @@ export class ElowenSpanViz extends LightMobxLitElement {
         id=${this.span.id}
         style=${styleMap({ visibility: "hidden" })}
       >
-        ${this.span.text}
+        ${sanitizeUnresolvedLatex(this.span.text)}
       </span>`;
     }
 

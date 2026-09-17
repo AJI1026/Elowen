@@ -170,6 +170,13 @@ span.collapsed {
     &.gray {
       background-color: var(--md-sys-color-highlight-light-gray);
     }
+
+    // Hover affordance for click-to-translate (set by elowen_reader).
+    // Declared last so it also shows on already-highlighted words.
+    &.word-hover {
+      box-shadow: inset 0 -2px 0 var(--md-sys-color-primary);
+      border-radius: 2px;
+    }
   }
 
   // Katex outputs both katex-mathml and katex-html tags.

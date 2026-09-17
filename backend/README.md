@@ -26,6 +26,8 @@ docker compose up --build
 
 - `GET /api/health`
 - `GET /api/collections`
+- `GET /api/library` / `PUT /api/library/{id}` / `DELETE /api/library[/{id}]`
+- `GET /api/settings` / `PUT /api/settings`
 - `GET /api/papers/{id}/metadata`
 - `GET /api/papers/{id}/versions/{v}`
 - `GET /api/papers/{id}/status`

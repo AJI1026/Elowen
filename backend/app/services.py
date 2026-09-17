@@ -65,6 +65,7 @@ def request_import(session: Session, arxiv_id: str) -> dict[str, Any]:
             and not is_stuck_waiting
             and status != "TIMEOUT"
         ):
+            _ensure_library_entry(session, paper_id, metadata_camel, "complete")
             return {"metadata": metadata_camel}
         if status == "TIMEOUT":
             raise TimeoutError("This paper cannot be loaded (time limit exceeded)")
@@ -76,7 +77,37 @@ def request_import(session: Session, arxiv_id: str) -> dict[str, Any]:
     }
     repo.write_version_doc(session, paper_id, version, doc, merge=False)
     repo.upsert_metadata_item(session, paper_id, metadata_camel)
+    _ensure_library_entry(session, paper_id, metadata_camel, "loading")
     return {"metadata": metadata_camel}
+
+
+def _ensure_library_entry(
+    session: Session,
+    paper_id: str,
+    metadata: dict,
+    status: str,
+) -> None:
+    existing = repo.get_library_paper(session, paper_id)
+    if existing:
+        existing = {
+            **existing,
+            "metadata": metadata,
+            "status": status if existing.get("status") != "complete" else existing["status"],
+        }
+        if status == "complete":
+            existing["status"] = "complete"
+        repo.upsert_library_paper(session, paper_id, existing)
+        return
+    repo.upsert_library_paper(
+        session,
+        paper_id,
+        {
+            "metadata": metadata,
+            "history": [],
+            "status": status,
+            "addedTimestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+        },
+    )
 
 
 def process_waiting_import(
@@ -173,6 +204,9 @@ def process_waiting_import(
                 out = convert_keys(dc_asdict(parsed), "snake_to_camel")
                 out["loadingStatus"] = "SUCCESS"
                 repo.write_version_doc(session, paper_id, version, out, merge=False)
+                _ensure_library_entry(
+                    session, paper_id, out.get("metadata") or {}, "complete"
+                )
             except Exception as e:  # noqa: BLE001
                 logger.exception("Summarizing failed for %s", paper_id)
                 repo.write_version_doc(
@@ -192,14 +226,20 @@ def process_waiting_import(
 
 
 def generate_answer(
-    doc_dict: dict, request_dict: dict, model_config: dict | None, api_key: str | None
+    doc_dict: dict,
+    request_dict: dict,
+    model_config: dict | None,
+    api_key: str | None,
+    history: list[dict] | None = None,
+    conversation_summary: str | None = None,
 ) -> dict:
+    """Ask / Explain / Translate popup / mindmap via functions.answers."""
     bootstrap_functions_path()
     from dataclasses import asdict as dc_asdict
 
     from answers import answers  # type: ignore
     from models.request_context import use_model_credentials  # type: ignore
-    from shared.api import ElowenAnswerRequest  # type: ignore
+    from shared.api import ElowenAnswer, ElowenAnswerRequest  # type: ignore
     from shared.constants import MAX_HIGHLIGHT_LENGTH, MAX_QUERY_LENGTH  # type: ignore
     from shared.elowen_doc import ElowenDoc  # type: ignore
     from shared.json_utils import convert_keys  # type: ignore
@@ -219,12 +259,35 @@ def generate_answer(
     if elowen_request.highlight and len(elowen_request.highlight) > MAX_HIGHLIGHT_LENGTH:
         raise ValueError("Highlight exceeds max length.")
 
+    prior_answers: list[ElowenAnswer] = []
+    for item in history or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            prior_answers.append(
+                from_dict(
+                    data_class=ElowenAnswer,
+                    data=convert_keys(item, "camel_to_snake"),
+                    config=Config(check_types=False),
+                )
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("Skipping malformed history item", exc_info=True)
+
     effective_key = api_key or (model_config or {}).get("apiKey")
     with use_model_credentials(api_key=effective_key, model_config=model_config):
-        elowen_answer = answers.generate_elowen_answer(
-            doc, elowen_request, effective_key, model_config
+        elowen_answer, updated_summary = answers.generate_elowen_answer(
+            doc,
+            elowen_request,
+            effective_key,
+            model_config,
+            prior_answers=prior_answers,
+            conversation_summary=conversation_summary,
         )
-    return convert_keys(dc_asdict(elowen_answer), "snake_to_camel")
+    result = convert_keys(dc_asdict(elowen_answer), "snake_to_camel")
+    if updated_summary:
+        result["conversationSummary"] = updated_summary
+    return result
 
 
 def generate_personal_summary(

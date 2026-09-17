@@ -51,6 +51,7 @@ Here are the sentences from the document:
 ELOWEN_PROMPT_DEFINE = (
     _ELOWEN_ANSWER_BASE_PROMPT
     + """
+{conversation_history}
 The user has highlighted the following text and wants a definition: "{highlight}"
 
 Please explain this term/phrase for a paper reader who may not be an expert:
@@ -64,25 +65,28 @@ Do not stay at slogan-length; the goal is that the reader does not need to leave
 ELOWEN_PROMPT_ANSWER = (
     _ELOWEN_ANSWER_BASE_PROMPT
     + """
+{conversation_history}
 The user has asked the following question: "{query}"
 
-Please provide a clear answer to the question.
+Please provide a clear answer to the question. If prior conversation is shown above, stay consistent with it and resolve follow-ups (e.g. "它", "that", "the method") using that context.
 """
 )
 
 ELOWEN_PROMPT_ANSWER_WITH_CONTEXT = (
     _ELOWEN_ANSWER_BASE_PROMPT
     + """
+{conversation_history}
 The user has highlighted the following text: "{highlight}"
 And has asked the following question: "{query}"
 
-Please provide a clear answer to the question, using the highlighted text as context.
+Please provide a clear answer to the question, using the highlighted text as context. If prior conversation is shown above, stay consistent with it.
 """
 )
 
 ELOWEN_PROMPT_DEFINE_IMAGE = (
     _ELOWEN_ANSWER_BASE_PROMPT
     + """
+{conversation_history}
 The user has a question about the attached image.
 The image has the following caption: "{caption}"
 
@@ -93,10 +97,11 @@ Please provide a clear explanation of the image, using the caption as context.
 ELOWEN_PROMPT_ANSWER_IMAGE = (
     _ELOWEN_ANSWER_BASE_PROMPT
     + """
+{conversation_history}
 The user has asked the following question about a given image: "{query}"
 The image has the following caption: "{caption}"
 
-Please provide a clear answer to the question, using the image and its caption as context.
+Please provide a clear answer to the question, using the image and its caption as context. If prior conversation is shown above, stay consistent with it.
 """
 )
 
@@ -117,6 +122,7 @@ Output format requirements:
 ELOWEN_PROMPT_MINDMAP = (
     _ELOWEN_ANSWER_BASE_PROMPT
     + """
+{conversation_history}
 The user wants a logic mind map for the whole paper (or the provided document excerpts).
 
 Please extract the paper's logical structure as a mind map (problem → approach → method details → results/validation when available).
@@ -127,10 +133,26 @@ Please extract the paper's logical structure as a mind map (problem → approach
 ELOWEN_PROMPT_MINDMAP_WITH_CONTEXT = (
     _ELOWEN_ANSWER_BASE_PROMPT
     + """
+{conversation_history}
 The user has highlighted the following text: "{highlight}"
 And wants a logic mind map focused on this passage (with surrounding document context as needed).
 
 Please extract the highlighted passage's logical structure as a mind map.
 """
     + _ELOWEN_MINDMAP_FORMAT_INSTRUCTIONS
+)
+
+ELOWEN_PROMPT_TRANSLATE = (
+    _ELOWEN_ANSWER_BASE_PROMPT
+    + """
+{conversation_history}
+The user has highlighted the following text and wants a translation: "{highlight}"
+
+This is a translation for a small hover popup, not a definition or lecture.
+1. Start with a short bold translation of the highlighted text into the response language.
+2. If it is a word or short phrase: add at most 1-2 short sentences (part of speech if useful, then the meaning in this paper).
+3. If it is a sentence or longer passage: give a fluent translation, then at most one sentence of notes if a literal rendering would mislead.
+4. If the highlighted text is already in the response language, give a concise paraphrase instead of repeating it.
+Keep the whole answer brief enough to read in a popup.
+"""
 )

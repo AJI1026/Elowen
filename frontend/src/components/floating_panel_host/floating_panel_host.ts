@@ -33,8 +33,10 @@ import {
   OverflowMenuProps,
   ReferenceTooltipProps,
   SmartHighlightMenuProps,
+  TranslateTooltipProps,
   UserAnnotationTooltipProps,
 } from "../../services/floating_panel_service";
+import { RouterService } from "../../services/router.service";
 
 import type { MdMenu } from "@material/web/menu/menu.js";
 import { styles } from "./floating_panel_host.scss";
@@ -42,11 +44,13 @@ import { styles } from "./floating_panel_host.scss";
 import "../answer_highlight_tooltip/answer_highlight_tooltip";
 import "../concept_tooltip/concept_tooltip";
 import "../footnote_tooltip/footnote_tooltip";
+import "../translate_tooltip/translate_tooltip";
 import "../info_tooltip/info_tooltip";
 import "../overflow_menu/overflow_menu";
 import "../reference_tooltip/reference_tooltip";
 import "../user_annotation_tooltip/user_annotation_tooltip";
 import { classMap } from "lit/directives/class-map.js";
+import { keyed } from "lit/directives/keyed.js";
 
 /**
  * A host component that displays and positions a floating panel using md-menu.
@@ -56,13 +60,26 @@ export class FloatingPanelHost extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
   private readonly floatingPanelService = core.getService(FloatingPanelService);
+  private readonly routerService = core.getService(RouterService);
   private readonly menuRef = createRef<MdMenu>();
+  private closingIntentionally = false;
 
   private disposer: () => void = () => {};
   protected override firstUpdated(_changedProperties: PropertyValues): void {
     this.disposer = reaction(
-      () => this.floatingPanelService.isVisible,
-      (isVisible) => {
+      () =>
+        [
+          this.floatingPanelService.isVisible,
+          this.floatingPanelService.contentProps,
+          this.floatingPanelService.targetElement,
+          this.routerService.activePage,
+        ] as const,
+      ([isVisible, , , page], prev) => {
+        const prevPage = prev?.[3];
+        if (prevPage !== undefined && page !== prevPage) {
+          this.floatingPanelService.hide();
+          return;
+        }
         if (isVisible) {
           this.openMenu();
         } else {
@@ -83,29 +100,40 @@ export class FloatingPanelHost extends MobxLitElement {
     }
 
     const anchorElement = this.floatingPanelService.targetElement;
-    if (!anchorElement) return;
+    if (!anchorElement || !anchorElement.isConnected) {
+      this.floatingPanelService.hide();
+      return;
+    }
 
     this.menuRef.value.anchorElement = anchorElement;
+    this.menuRef.value.yOffset = 4;
 
     if (!this.menuRef.value.open) {
-      this.menuRef.value.yOffset = 4;
-
       window.setTimeout(() => {
-        this.menuRef.value?.show();
+        if (this.floatingPanelService.isVisible) {
+          this.menuRef.value?.show();
+        }
       });
     }
   }
 
   private closeMenu() {
     if (this.menuRef.value?.open) {
+      this.closingIntentionally = true;
       this.menuRef.value.close();
     }
   }
 
   private handleMenuClosed() {
-    if (this.floatingPanelService.isVisible) {
-      this.floatingPanelService.hide();
+    const intended = this.closingIntentionally;
+    this.closingIntentionally = false;
+    if (intended) {
+      if (this.floatingPanelService.isVisible) {
+        this.openMenu();
+      }
+      return;
     }
+    this.floatingPanelService.hide();
   }
 
   private renderContent() {
@@ -128,6 +156,13 @@ export class FloatingPanelHost extends MobxLitElement {
 
     if (contentProps instanceof ConceptTooltipProps) {
       return html` <concept-tooltip .props=${contentProps}></concept-tooltip> `;
+    }
+
+    if (contentProps instanceof TranslateTooltipProps) {
+      return keyed(
+        contentProps.selectedText,
+        html`<translate-tooltip .props=${contentProps}></translate-tooltip>`
+      );
     }
 
     if (contentProps instanceof FootnoteTooltipProps) {
@@ -179,13 +214,17 @@ export class FloatingPanelHost extends MobxLitElement {
       panel: true,
       "has-flat-container": hasFlatContainer === true,
     });
+    const stayOpenOnOutsideClick = !(
+      this.floatingPanelService.contentProps instanceof TranslateTooltipProps
+    );
+
     return html`
       <span class=${menuWrapperClasses}>
         <md-menu
           ${ref(this.menuRef)}
           quick
           @closed=${this.handleMenuClosed}
-          .stayOpenOnOutsideClick=${true}
+          .stayOpenOnOutsideClick=${stayOpenOnOutsideClick}
           positioning="popover"
           anchor-corner=${anchorCorner}
           menu-corner=${menuCorner}

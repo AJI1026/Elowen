@@ -18,11 +18,10 @@
 import { MobxLitElement } from "@adobe/lit-mobx";
 import { CSSResultGroup, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { ConceptTooltipProps } from "../../services/floating_panel_service";
-import { styles } from "./concept_tooltip.scss";
+import { TranslateTooltipProps } from "../../services/floating_panel_service";
+import { styles } from "./translate_tooltip.scss";
 import { core } from "../../core/core";
 import { DocumentStateService } from "../../services/document_state.service";
-import { ApiService } from "../../services/api.service";
 import { SettingsService } from "../../services/settings.service";
 import { HistoryService } from "../../services/history.service";
 import { getElowenResponseCallable } from "../../shared/callables";
@@ -31,69 +30,101 @@ import { ElowenContent } from "../../shared/elowen_doc";
 import { t } from "../../shared/i18n";
 
 import "../../pair-components/circular_progress";
-import "../elowen_concept/elowen_concept_contents";
 import "../elowen_content/elowen_content";
-import "../wikipedia_section/wikipedia_section";
 
 /**
- * A tooltip that explains a ElowenConcept using the configured response language,
- * with an optional Wikipedia enrichment section.
+ * A compact popup that translates the current text selection in place.
  */
-@customElement("concept-tooltip")
-export class ConceptTooltip extends MobxLitElement {
+const translationCache = new Map<string, ElowenAnswer>();
+const MAX_CACHE_ENTRIES = 200;
+
+@customElement("translate-tooltip")
+export class TranslateTooltip extends MobxLitElement {
   static override styles: CSSResultGroup = [styles];
 
-  @property({ type: Object }) props!: ConceptTooltipProps;
+  @property({ type: Object }) props!: TranslateTooltipProps;
 
   @state() private answer?: ElowenAnswer;
   @state() private isLoading = true;
   @state() private loadFailed = false;
+  private loadGeneration = 0;
+  private loadedText = "";
 
   private readonly documentStateService = core.getService(DocumentStateService);
-  private readonly apiService = core.getService(ApiService);
   private readonly settingsService = core.getService(SettingsService);
   private readonly historyService = core.getService(HistoryService);
 
-  override connectedCallback(): void {
-    super.connectedCallback();
-    void this.loadDefinition();
+  protected override updated() {
+    // Idempotent: load whenever the rendered text differs from the last load.
+    // (Lit's changed-properties map is not reliable for the first update.)
+    const text = this.props?.selectedText?.trim();
+    if (!text || text === this.loadedText) return;
+    this.loadedText = text;
+    void this.loadTranslation();
   }
 
-  private async loadDefinition() {
+  private displayText() {
+    const text = this.props?.selectedText?.trim() ?? "";
+    if (text.length <= 80) return text;
+    return `${text.slice(0, 77)}…`;
+  }
+
+  private async loadTranslation() {
     const elowenDoc = this.documentStateService.elowenDocManager?.elowenDoc;
-    if (!elowenDoc || !this.props?.concept) {
+    const selectedText = this.props?.selectedText?.trim();
+    const generation = ++this.loadGeneration;
+    if (!elowenDoc || !selectedText) {
       this.isLoading = false;
       this.loadFailed = true;
       return;
     }
 
+    const lang = this.settingsService.responseLanguage.value;
+    const cacheKey = `${lang}:${selectedText}`;
+    const cached = translationCache.get(cacheKey);
+    if (cached) {
+      this.isLoading = false;
+      this.loadFailed = false;
+      this.answer = cached;
+      return;
+    }
+
     this.isLoading = true;
     this.loadFailed = false;
+    this.answer = undefined;
 
     try {
       const paperId = elowenDoc.metadata?.paperId ?? "";
       const askContext = paperId
         ? this.historyService.getAskContext(paperId)
         : { history: [] as ElowenAnswer[] };
-      this.answer = await getElowenResponseCallable(
+      const answer = await getElowenResponseCallable(
         null,
         elowenDoc,
         {
           query: "",
-          highlight: this.props.concept.name,
-          highlightedSpans: this.props.spanId
-            ? [{ spanId: this.props.spanId }]
-            : [],
+          highlight: selectedText,
+          highlightedSpans: this.props.highlightedSpans,
+          responseMode: "translate",
         },
         this.settingsService.getModelConfig(),
         askContext.history,
         askContext.conversationSummary
       );
+      if (generation !== this.loadGeneration) return;
+      if (translationCache.size >= MAX_CACHE_ENTRIES) {
+        translationCache.clear();
+      }
+      translationCache.set(cacheKey, answer);
+      this.answer = answer;
     } catch (error) {
-      console.error("Error loading concept definition:", error);
+      if (generation !== this.loadGeneration) return;
+      console.error("Error loading translation:", error);
       this.loadFailed = true;
     } finally {
-      this.isLoading = false;
+      if (generation === this.loadGeneration) {
+        this.isLoading = false;
+      }
     }
   }
 
@@ -115,60 +146,41 @@ export class ConceptTooltip extends MobxLitElement {
     ></elowen-content>`;
   }
 
-  private renderWikipedia() {
-    return html`<elowen-wikipedia-section
-      .term=${this.props.concept.name}
-      .enabled=${true}
-    ></elowen-wikipedia-section>`;
-  }
-
   override render() {
-    if (!this.props?.concept) {
+    if (!this.props?.selectedText) {
       return nothing;
     }
 
-    const { concept } = this.props;
+    const lang = this.settingsService.responseLanguage.value;
 
     if (this.isLoading) {
       return html`
-        <div class="concept-tooltip-component">
-          <div class="concept-name">${concept.name}</div>
+        <div class="translate-tooltip-component">
+          <div class="selected-text">${this.displayText()}</div>
           <div class="loading">
             <pr-circular-progress></pr-circular-progress>
           </div>
-          ${this.renderWikipedia()}
         </div>
       `;
     }
 
     if (this.answer?.responseContent?.length) {
       return html`
-        <div class="concept-tooltip-component">
-          <div class="concept-name">${concept.name}</div>
+        <div class="translate-tooltip-component">
+          <div class="selected-text">${this.displayText()}</div>
           ${this.answer.responseContent.map((content) =>
             this.renderAnswerContent(content)
           )}
-          ${this.renderWikipedia()}
         </div>
       `;
     }
 
     return html`
-      <div class="concept-tooltip-component">
-        <div class="concept-name">${concept.name}</div>
-        ${this.loadFailed
-          ? html`<div class="fallback-note">
-              ${t(
-                "concept.loadFailed",
-                this.settingsService.responseLanguage.value
-              )}
-            </div>`
-          : nothing}
-        <elowen-concept-contents
-          .conceptId=${concept.id}
-          .contents=${concept.contents}
-        ></elowen-concept-contents>
-        ${this.renderWikipedia()}
+      <div class="translate-tooltip-component">
+        <div class="selected-text">${this.displayText()}</div>
+        <div class="fallback-note">
+          ${t("translate.loadFailed", lang)}
+        </div>
       </div>
     `;
   }
@@ -176,6 +188,6 @@ export class ConceptTooltip extends MobxLitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "concept-tooltip": ConceptTooltip;
+    "translate-tooltip": TranslateTooltip;
   }
 }

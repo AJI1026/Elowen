@@ -22,12 +22,14 @@ import { ApiService } from "./api.service";
 import { RouterService } from "./router.service";
 import { Service } from "./service";
 import { HistoryService } from "./history.service";
+import { SettingsService } from "./settings.service";
 
 interface ServiceProvider {
   analyticsService: AnalyticsService;
   apiService: ApiService;
   historyService: HistoryService;
   routerService: RouterService;
+  settingsService: SettingsService;
 }
 
 export class InitializationService extends Service {
@@ -40,8 +42,11 @@ export class InitializationService extends Service {
   override async initialize() {
     this.sp.analyticsService.initialize();
     this.sp.apiService.initialize();
+    await this.sp.settingsService.initialize();
+    // Library must be ready before the router loads the home gallery,
+    // otherwise featured-image metadata is fetched with an empty paper list.
+    await this.sp.historyService.initialize();
     this.sp.routerService.initialize();
-    this.sp.historyService.initialize();
 
     this.isAppInitialized = true;
   }

@@ -27,18 +27,21 @@ chmod +x start-api.sh start-dev.sh   # once
 ./start-dev.sh      # API + frontend → http://localhost:4201
 ```
 
-Optional once: set your API key in the app **Settings** (used for import + Ask).
+Optional once: set your API key in the app **Settings** (saved to
+`data/settings.json`, loaded automatically on next start). You can also copy
+`backend/settings.example.json` → `data/settings.json` and fill in the key.
 Server-side `ELOWEN_API_KEY` / `api_config.py` remains an optional fallback for
 headless / CI use. **Never commit** real API keys — run `./scripts/setup-git-hooks.sh`
 once so pre-commit blocks them.
 
 Docker alternative: `docker compose up --build`
 
-Data lives under `./data/` (SQLite + `images/`). Seed fixtures in `backend/seed/`
-load on first boot.
+Data lives under `./data/` (SQLite + `images/` + `settings.json`). Seed fixtures
+in `backend/seed/` load on first boot. Imported papers and reading history live
+in SQLite (`paper_library` + paper tables), not browser storage.
 
-The API key in the web app Settings page is used for paper import and for
-in-paper Ask / highlights (stored in the browser / local app storage).
+The API key in Settings is used for paper import and for in-paper Ask /
+highlights (persisted in `data/settings.json`, not browser storage).
 
 ### Frontend only (API already running)
 

@@ -79,3 +79,14 @@ class ImportAttempt(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PaperLibrary(Base):
+    """User library / reading-history entry (PaperData JSON), stored under data/."""
+
+    __tablename__ = "paper_library"
+
+    paper_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    data_json: Mapped[str] = mapped_column(Text, default="{}")
+    added_at: Mapped[int] = mapped_column(Integer, default=0, index=True)
+

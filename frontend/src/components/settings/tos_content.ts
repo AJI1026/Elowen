@@ -37,30 +37,9 @@ export class TOSContent extends MobxLitElement {
   override render() {
     const lang = this.uiLang();
     return html`
-      <p>
-        ${t("tos.p1", lang)}
-        <a href="https://ai.google.dev/gemini-api/terms" target="_blank">
-          ${t("tos.p1Link", lang)}</a
-        >
-      </p>
-      <p>
-        ${t("tos.p2", lang)}
-        <a href="mailto:lumi-team@google.com" target="_blank">
-          lumi-team@google.com</a
-        >
-        ${t("tos.p2After", lang)}
-      </p>
+      <p>${t("tos.p1", lang)}</p>
+      <p>${t("tos.p2", lang)}</p>
       <p>${t("tos.p3", lang)}</p>
-      <p>
-        ${t("tos.p4Before", lang)}
-        <a href="https://pair.withgoogle.com/" target="_blank">
-          People and AI Research (PAIR)
-        </a>
-        ${t("tos.p4Mid", lang)}
-        <a href="https://policies.google.com/privacy" target="_blank">
-          ${t("tos.p4Privacy", lang)}</a
-        >${t("tos.p4After", lang)}
-      </p>
       <p>
         ${t("tos.p5Before", lang)}
         <a href="https://github.com/AJI1026/Elowen" target="_blank">

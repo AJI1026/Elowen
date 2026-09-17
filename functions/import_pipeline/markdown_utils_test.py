@@ -392,6 +392,13 @@ Hello, world again!"""
                 markdown_utils.postprocess_content_text(text_input), text_input
             )
 
+        with self.subTest("test_unresolved_fig_ref"):
+            text_input = r"As shown in Fig.~\ref{fig:teaser}, our method is faster."
+            expected = "As shown in Fig. teaser, our method is faster."
+            self.assertEqual(
+                markdown_utils.postprocess_content_text(text_input), expected
+            )
+
         with self.subTest("test_strip_double_brackets"):
             # Test case: Remove simple [[content]]
             text_input = "Remove this [[content]]."
@@ -437,6 +444,33 @@ Hello, world again!"""
                 text_input_none,
             )
 
+    def test_sanitize_unresolved_latex(self):
+        with self.subTest("prefixed_fig_ref"):
+            self.assertEqual(
+                markdown_utils.sanitize_unresolved_latex(
+                    r"As shown in Fig.~\ref{fig:teaser}, our method is faster."
+                ),
+                "As shown in Fig. teaser, our method is faster.",
+            )
+
+        with self.subTest("prefixed_eq_ref"):
+            self.assertEqual(
+                markdown_utils.sanitize_unresolved_latex(
+                    r"In Eq.~\ref{eq:ori_oit}, addition is commutative."
+                ),
+                "In Eq. ori_oit, addition is commutative.",
+            )
+
+        with self.subTest("bare_fig_ref"):
+            self.assertEqual(
+                markdown_utils.sanitize_unresolved_latex(r"see \ref{fig:method}"),
+                "see Fig. method",
+            )
+
+        with self.subTest("leaves_math_alone"):
+            text = r"Compute $\mathbf{x}$ then stop."
+            self.assertEqual(markdown_utils.sanitize_unresolved_latex(text), text)
+
     def test_normalize_bare_span_refs(self):
         with self.subTest("rewrites_bare_ids"):
             text = "claim [[e6c0b60d]] and [[abc]]"
@@ -450,6 +484,17 @@ Hello, world again!"""
             self.assertEqual(
                 markdown_utils.normalize_bare_span_refs(text), text
             )
+
+        with self.subTest("keeps_equation_and_content_placeholders"):
+            text = (
+                "eq [[ELOWEN_EQUATION_uid1]] and fig "
+                "[[ELOWEN_PLACEHOLDER_html1]] then [[abc]]"
+            )
+            out = markdown_utils.normalize_bare_span_refs(text)
+            self.assertIn("[[ELOWEN_EQUATION_uid1]]", out)
+            self.assertIn("[[ELOWEN_PLACEHOLDER_html1]]", out)
+            self.assertIn("[[l-sref-abc]]", out)
+            self.assertNotIn("[[l-sref-ELOWEN_EQUATION_uid1]]", out)
 
 
 if __name__ == "__main__":

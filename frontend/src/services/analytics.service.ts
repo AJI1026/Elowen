@@ -31,6 +31,7 @@ export enum AnalyticsAction {
 
   // elowen_reader
   READER_TEXT_SELECTION = "reader_text_selection",
+  READER_WORD_TRANSLATE = "reader_word_translate",
   READER_CONCEPT_CLICK = "reader_concept_click",
   READER_IMAGE_CLICK = "reader_image_click",
 

@@ -105,26 +105,28 @@ async function fetchSummaryForTitle(
   }
 }
 
-/** MediaWiki opensearch → best matching page title. */
-async function searchBestTitle(
+/** MediaWiki opensearch → matching page titles (prefix matches only). */
+async function searchTitles(
   lang: "zh" | "en",
   query: string
-): Promise<string | null> {
+): Promise<string[]> {
   const url =
     `https://${wikiHost(lang)}/w/api.php` +
     `?action=opensearch&search=${encodeURIComponent(query.trim())}` +
-    `&limit=1&namespace=0&format=json&origin=*`;
+    `&limit=5&namespace=0&format=json&origin=*`;
   try {
     const response = await fetch(url);
-    if (!response.ok) return null;
+    if (!response.ok) return [];
     const data = (await response.json()) as unknown;
-    if (!Array.isArray(data) || data.length < 2) return null;
+    if (!Array.isArray(data) || data.length < 2) return [];
     const titles = data[1];
-    if (!Array.isArray(titles) || titles.length === 0) return null;
-    const title = titles[0];
-    return typeof title === "string" && title.trim() ? title.trim() : null;
+    if (!Array.isArray(titles)) return [];
+    return titles.filter(
+      (title): title is string =>
+        typeof title === "string" && !!title.trim()
+    );
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -133,14 +135,18 @@ async function fetchSummaryForLang(
   term: string
 ): Promise<WikipediaSummary | null> {
   for (const candidate of wikipediaTermCandidates(term)) {
-    const direct = await fetchSummaryForTitle(lang, candidate);
-    if (direct) return direct;
+    // Resolve the page title through opensearch first. That endpoint answers
+    // 200 (with an empty list) when nothing matches, so we never request a
+    // summary for a non-existent title, which the REST API answers with a 404
+    // that browsers always surface as a console error.
+    const titles = await searchTitles(lang, candidate);
+    if (titles.length === 0) continue;
 
-    const searched = await searchBestTitle(lang, candidate);
-    if (searched && searched.toLowerCase() !== candidate.toLowerCase()) {
-      const viaSearch = await fetchSummaryForTitle(lang, searched);
-      if (viaSearch) return viaSearch;
-    }
+    const exact = titles.find(
+      (title) => title.toLowerCase() === candidate.toLowerCase()
+    );
+    const summary = await fetchSummaryForTitle(lang, exact ?? titles[0]);
+    if (summary) return summary;
   }
   return null;
 }

@@ -38,4 +38,8 @@ mkdir -p "$ELOWEN_DATA_DIR" "$ELOWEN_IMAGES_DIR"
 
 echo "API → http://127.0.0.1:8000  (Ctrl+C to stop)"
 cd "$ROOT/backend"
-exec python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+# Watch shared library too — answer/math fixes live under functions/.
+exec python -m uvicorn app.main:app --reload \
+  --reload-dir "$ROOT/backend" \
+  --reload-dir "$ROOT/functions" \
+  --host 127.0.0.1 --port 8000

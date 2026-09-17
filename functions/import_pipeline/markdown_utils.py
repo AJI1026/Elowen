@@ -146,6 +146,73 @@ def parse_elowen_import(model_output_string: str) -> dict:
     return parsed_data
 
 
+_LATEX_TYPED_REF_PREFIX = {
+    "fig": "Fig.",
+    "figure": "Fig.",
+    "eq": "Eq.",
+    "eqn": "Eq.",
+    "equation": "Eq.",
+    "tab": "Table",
+    "table": "Table",
+    "sec": "Sec.",
+    "section": "Sec.",
+}
+
+# "Fig.~\ref{fig:teaser}" / "Eq.~\ref{eq:1}"
+_PREFIXED_LATEX_REF_PATTERN = re.compile(
+    r"(?P<prefix>Fig(?:ure)?\.?|Tab(?:le)?\.?|Eq(?:n|uation)?\.?|Sec(?:tion)?\.?)"
+    r"\s*~?\s*"
+    r"\\(?:eqref|[Cc]ref\*?|autoref|ref\*?)\s*\{(?P<label>[^}]+)\}"
+)
+
+_BARE_LATEX_REF_PATTERN = re.compile(
+    r"\\(?:eqref|[Cc]ref\*?|autoref|ref\*?)\s*\{(?P<label>[^}]+)\}"
+)
+
+
+def _humanize_latex_ref_label(label: str) -> str:
+    label = label.strip()
+    if ":" in label:
+        return label.rsplit(":", 1)[-1].strip()
+    return label
+
+
+def _fallback_latex_ref_text(label: str) -> str:
+    raw = label.strip()
+    key = raw.split(":", 1)[0].lower() if ":" in raw else ""
+    name = _humanize_latex_ref_label(raw)
+    prefix = _LATEX_TYPED_REF_PREFIX.get(key)
+    if prefix:
+        return f"{prefix} {name}"
+    return name
+
+
+def sanitize_unresolved_latex(text: str) -> str:
+    """Turn leftover LaTeX cross-refs into readable text (e.g. Fig.~\\ref{fig:teaser} → Fig. teaser).
+
+    Math ($...$ / $$...$$) is left untouched so KaTeX equations keep their commands.
+    """
+    if not text:
+        return text
+    if "\\ref" not in text and "\\eqref" not in text and "\\cref" not in text and "\\Cref" not in text and "\\autoref" not in text and "~" not in text:
+        return text
+
+    protected, math_placeholders = _protect_math_expressions(text)
+
+    def _prefixed(match: re.Match) -> str:
+        return f"{match.group('prefix')} {_humanize_latex_ref_label(match.group('label'))}"
+
+    protected = _PREFIXED_LATEX_REF_PATTERN.sub(_prefixed, protected)
+    protected = _BARE_LATEX_REF_PATTERN.sub(
+        lambda m: _fallback_latex_ref_text(m.group("label")), protected
+    )
+    protected = re.sub(r"(?<=\S)~(?=\S)", " ", protected)
+
+    for placeholder, original_math in math_placeholders.items():
+        protected = protected.replace(placeholder, original_math)
+    return protected
+
+
 def _apply_katex_substitutions(text: str) -> str:
     """Applies KaTeX substitutions to a string."""
     for substitution in KATEX_SUBSTITUTIONS:
@@ -272,6 +339,8 @@ def postprocess_content_text(text: str, strip_double_brackets=False) -> str:
     # (3) If the flag is set, remove remaining double square brackets, e.g. [[content]]
     if strip_double_brackets:
         text = re.sub(r"\[\[.*?\]\]", "", text)
+    # (4) Leftover LaTeX \ref / ~ from the importer
+    text = sanitize_unresolved_latex(text)
     return text
 
 
@@ -282,7 +351,8 @@ _BARE_SPAN_REF_PATTERN = re.compile(r"\[\[(?!l-)([^\]]{1,64})\]\]")
 def normalize_bare_span_refs(text: str) -> str:
     """Rewrite bare ``[[spanId]]`` citations into the canonical ``[[l-sref-…]]`` form.
 
-    Leaves other Elowen tags (already ``[[l-…]]``) and bracketed prose alone.
+    Leaves other Elowen tags (already ``[[l-…]]``), pipeline placeholders such as
+    ``[[ELOWEN_EQUATION_…]]``, and bracketed prose alone.
     """
     if not text:
         return text
@@ -291,6 +361,8 @@ def normalize_bare_span_refs(text: str) -> str:
         inner = match.group(1).strip()
         # Span ids are compact tokens (uuid fragments / alphanumeric), not phrases.
         if not inner or " " in inner or "\n" in inner:
+            return match.group(0)
+        if inner.startswith("ELOWEN_"):
             return match.group(0)
         if not re.fullmatch(r"[A-Za-z0-9_.:-]+", inner):
             return match.group(0)

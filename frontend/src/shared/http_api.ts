@@ -44,6 +44,43 @@ export function imageUrl(storagePath: string): string {
 export const httpApi = {
   getCollections: () => request<any[]>("/collections"),
 
+  getLibrary: () => request<any[]>("/library"),
+
+  putLibraryPaper: (paperId: string, data: unknown) =>
+    request<any>(`/library/${encodeURIComponent(paperId)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteLibraryPaper: (paperId: string) =>
+    request<{ status: string }>(`/library/${encodeURIComponent(paperId)}`, {
+      method: "DELETE",
+    }),
+
+  clearLibrary: () =>
+    request<{ status: string }>("/library", { method: "DELETE" }),
+
+  getSettings: () =>
+    request<{
+      modelProvider?: string;
+      providerSettings?: Record<string, unknown>;
+      responseLanguage?: string;
+    }>("/settings"),
+
+  putSettings: (payload: {
+    modelProvider?: string;
+    providerSettings?: unknown;
+    responseLanguage?: string;
+  }) =>
+    request<{
+      modelProvider?: string;
+      providerSettings?: Record<string, unknown>;
+      responseLanguage?: string;
+    }>("/settings", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
   getMetadataItem: (paperId: string) =>
     request<any>(`/papers/${encodeURIComponent(paperId)}/metadata-item`),
 
@@ -78,12 +115,16 @@ export const httpApi = {
     request: unknown;
     modelConfig?: unknown;
     apiKey?: string;
+    history?: unknown[];
+    conversationSummary?: string;
   }) =>
     request<any>("/ask", {
       method: "POST",
       body: JSON.stringify({
         ...payload,
         apiKey: payload.apiKey ?? (payload.modelConfig as { apiKey?: string } | undefined)?.apiKey,
+        history: payload.history ?? [],
+        conversationSummary: payload.conversationSummary ?? undefined,
       }),
     }),
 

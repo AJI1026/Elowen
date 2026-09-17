@@ -98,6 +98,167 @@ export function normalizeSelectionText(text: string): string {
   return lines.join(" ").replace(/[ \t]{2,}/g, " ").trim();
 }
 
+function isTextCharElement(el: Element): el is HTMLElement {
+  if (!(el instanceof HTMLElement)) return false;
+  if (
+    el.classList.contains(CITATION_CLASSNAME) ||
+    el.classList.contains(FOOTNOTE_CLASSNAME)
+  ) {
+    return false;
+  }
+  if (el.classList.contains("equation") || el.classList.contains("katex")) {
+    return false;
+  }
+  if (el.tagName === "A" || el.tagName === "SUP") return false;
+  return (el.textContent ?? "").length > 0;
+}
+
+/** True when the click target should not trigger click-to-translate. */
+export function shouldSkipWordTranslate(target: HTMLElement): boolean {
+  if (target.closest("a, button, pr-button, input, textarea")) return true;
+  if (target.classList.contains("concept") || target.closest(".concept")) {
+    return true;
+  }
+  if (target.classList.contains("clickable") || target.closest(".clickable")) {
+    return true;
+  }
+  if (
+    target.closest(
+      `.${CITATION_CLASSNAME}, .${FOOTNOTE_CLASSNAME}, .equation, .katex`
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Innermost paper character span from a click, if any. */
+export function characterElementFromEvent(event: Event): HTMLElement | null {
+  for (const node of event.composedPath()) {
+    if (!(node instanceof HTMLElement)) continue;
+    if (node.classList.contains("character")) return node;
+  }
+  return null;
+}
+
+function wordRangeAt(text: string, index: number): { start: number; end: number; text: string } | null {
+  if (index < 0 || index >= text.length) return null;
+
+  const ch = text[index] ?? "";
+  if (/\p{Script=Han}/u.test(ch)) {
+    return { start: index, end: index + 1, text: ch };
+  }
+  const isWordChar = (c: string) => /[\p{L}\p{N}'’._-]/u.test(c);
+  if (!isWordChar(ch)) return null;
+  let start = index;
+  let end = index + 1;
+  while (start > 0 && isWordChar(text[start - 1] ?? "")) start--;
+  while (end < text.length && isWordChar(text[end] ?? "")) end++;
+  const word = text.slice(start, end).replace(/^['’._-]+|['’._-]+$/g, "");
+  if (!word) return null;
+  const trimmedStart = text.indexOf(word, start);
+  return {
+    start: trimmedStart,
+    end: trimmedStart + word.length,
+    text: word,
+  };
+}
+
+/**
+ * Expand the character under a paper click into a word, using the
+ * per-character spans rendered inside `<elowen-span>`.
+ */
+export function getWordAtCharacterElement(
+  target: HTMLElement
+): SelectionInfo | null {
+  const resolved = resolveWordAtCharacterElement(target);
+  if (!resolved) return null;
+  const { elowenSpan, children, range } = resolved;
+
+  const anchor = children[range.startChar] ?? target;
+
+  return {
+    selectedText: range.text,
+    parentSpan: anchor,
+    highlightSelection: [
+      {
+        spanId: elowenSpan.id,
+        position: { startIndex: range.start, endIndex: range.end },
+      },
+    ],
+  };
+}
+
+interface ResolvedWord {
+  elowenSpan: HTMLElement;
+  /** Character spans belonging to the word, in reading order. */
+  children: HTMLElement[];
+  range: { start: number; end: number; text: string; startChar: number };
+}
+
+function resolveWordAtCharacterElement(
+  target: HTMLElement
+): ResolvedWord | null {
+  const elowenSpan = target.closest("elowen-span");
+  if (!(elowenSpan instanceof HTMLElement) || !elowenSpan.id) return null;
+
+  const renderer =
+    (target.closest(".elowen-span-renderer-element") as HTMLElement | null) ??
+    (elowenSpan.querySelector(".elowen-span-renderer-element") as HTMLElement | null) ??
+    (target.parentElement instanceof HTMLElement ? target.parentElement : null);
+  if (!renderer) return null;
+
+  const allChildren = Array.from(renderer.children).filter(isTextCharElement);
+  let index = allChildren.indexOf(target);
+  if (index < 0) {
+    const wrapped = target.closest("span");
+    if (wrapped instanceof HTMLElement) {
+      index = allChildren.indexOf(wrapped);
+    }
+  }
+  if (index < 0) return null;
+
+  const pieces = allChildren.map((el) => el.textContent ?? "");
+  const full = pieces.join("");
+  let offset = 0;
+  for (let i = 0; i < index; i++) {
+    offset += pieces[i].length;
+  }
+
+  const range = wordRangeAt(full, offset);
+  if (!range) return null;
+
+  let startChild = 0;
+  let seen = 0;
+  while (
+    startChild < pieces.length &&
+    seen + pieces[startChild].length <= range.start
+  ) {
+    seen += pieces[startChild].length;
+    startChild++;
+  }
+  let endChild = startChild;
+  let seenEnd = seen;
+  while (endChild < pieces.length && seenEnd < range.end) {
+    seenEnd += pieces[endChild].length;
+    endChild++;
+  }
+
+  return {
+    elowenSpan,
+    children: allChildren.slice(startChild, endChild),
+    range: { ...range, startChar: startChild },
+  };
+}
+
+/**
+ * Character spans covered by the word under a paper hover, so the whole word
+ * (not just one glyph) can be highlighted as a click affordance.
+ */
+export function getWordCharElements(target: HTMLElement): HTMLElement[] {
+  return resolveWordAtCharacterElement(target)?.children ?? [];
+}
+
 /** True when text looks like KaTeX/tokenized clipboard fragmentation. */
 export function looksLikeFragmentedClipboardText(text: string): boolean {
   if (!text.includes("\n")) return false;

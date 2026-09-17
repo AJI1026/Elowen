@@ -17,7 +17,11 @@
 
 import { expect } from "@esm-bundle/chai";
 
-import { extractArxivId, parseColonKeyValue } from "./string_utils";
+import {
+  extractArxivId,
+  parseColonKeyValue,
+  sanitizeUnresolvedLatex,
+} from "./string_utils";
 
 describe("string_utils", () => {
   describe("extractArxivId", () => {
@@ -110,6 +114,22 @@ describe("string_utils", () => {
       const input = "Category:";
       const result = parseColonKeyValue(input);
       expect(result).to.deep.equal({ key: "Category", value: "" });
+    });
+  });
+
+  describe("sanitizeUnresolvedLatex", () => {
+    it("rewrites Fig.~\\ref{...} into readable text", () => {
+      expect(
+        sanitizeUnresolvedLatex(
+          "As shown in Fig.~\\ref{fig:teaser}, our method is faster."
+        )
+      ).to.equal("As shown in Fig. teaser, our method is faster.");
+    });
+
+    it("rewrites a bare \\ref{fig:...}", () => {
+      expect(sanitizeUnresolvedLatex("see \\ref{fig:method}")).to.equal(
+        "see Fig. method"
+      );
     });
   });
 });
