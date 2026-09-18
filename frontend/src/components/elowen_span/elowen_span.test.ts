@@ -38,6 +38,23 @@ describe("elowen-span", () => {
     expect(spanElement?.textContent?.trim()).to.equal("hello world");
   });
 
+  it("renders br tags and newlines as line breaks", async () => {
+    const span: ElowenSpan = {
+      id: "s-br",
+      text: "公式如下：<br/>\nC=a+b\n结束",
+      innerTags: [],
+    };
+
+    const el = await fixture<ElowenSpanViz>(
+      html`<elowen-span .span=${span}></elowen-span>`
+    );
+
+    expect(el.querySelectorAll("br").length).to.equal(3);
+    expect(el.textContent).to.include("公式如下：");
+    expect(el.textContent).to.include("C=a+b");
+    expect(el.textContent).not.to.include("<br");
+  });
+
   it("renders leftover LaTeX figure refs as readable text", async () => {
     const span: ElowenSpan = {
       id: "s1",

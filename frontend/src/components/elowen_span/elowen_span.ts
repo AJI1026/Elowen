@@ -198,10 +198,23 @@ export class ElowenSpanViz extends LightMobxLitElement {
     ></span>`;
   }
 
+  private normalizeSpanText(text: string): string {
+    return sanitizeUnresolvedLatex(text);
+  }
+
+  private matchHtmlLineBreak(text: string, index: number): number {
+    const brMatch = text.slice(index).match(/^<br\s*\/?>/i);
+    return brMatch ? brMatch[0].length : 0;
+  }
+
   private renderFormattedCharacter(
     character: string,
     classesAndMetadata: { [key: string]: { [key: string]: any } }
   ): TemplateResult {
+    if (character === "\n") {
+      return html`<br />`;
+    }
+
     const classesObject: { [key: string]: boolean } = {};
     Object.keys(classesAndMetadata).forEach((key) => {
       classesObject[key] = true;
@@ -288,12 +301,26 @@ export class ElowenSpanViz extends LightMobxLitElement {
       characterClasses[this.font] = true;
     }
 
-    return html`${value
-      .split("")
-      .map(
-        (character) =>
-          html`<span class=${classMap(characterClasses)}>${character}</span>`
-      )}`;
+    const parts: TemplateResult[] = [];
+    for (let index = 0; index < value.length; ) {
+      const brLength = this.matchHtmlLineBreak(value, index);
+      if (brLength > 0) {
+        parts.push(html`<br />`);
+        index += brLength;
+        continue;
+      }
+      const character = value[index];
+      if (character === "\n") {
+        parts.push(html`<br />`);
+        index += 1;
+        continue;
+      }
+      parts.push(
+        html`<span class=${classMap(characterClasses)}>${character}</span>`
+      );
+      index += 1;
+    }
+    return html`${parts}`;
   }
 
   private createInsertionsMap() {
@@ -440,7 +467,7 @@ export class ElowenSpanViz extends LightMobxLitElement {
     }
 
     const allHighlights = [...highlights];
-    const spanText = sanitizeUnresolvedLatex(span.text);
+    const spanText = this.normalizeSpanText(span.text);
     const hasHighlight = highlights.length > 0;
 
     const allInnerTags = flattenTags(span.innerTags || []);
@@ -457,7 +484,7 @@ export class ElowenSpanViz extends LightMobxLitElement {
     // we can just return the plain text.
     if (!hasHighlight && !allInnerTags.length && insertions.size === 0) {
       this.renderedContent = html`<span class=${classMap(spanClasses)}>
-        ${this.renderNonformattedCharacters(sanitizeUnresolvedLatex(span.text))}
+        ${this.renderNonformattedCharacters(this.normalizeSpanText(span.text))}
       </span>`;
       return;
     }
@@ -510,61 +537,61 @@ export class ElowenSpanViz extends LightMobxLitElement {
     });
 
     let equationText = "";
-    // Map over each character of the text to create a list of TemplateResults.
-    // Each character will be wrapped in a <span> with the appropriate classes
-    // based on the formatting counters we built above.
-    const partsTemplateResults = spanText
-      .split("")
-      .flatMap((char: string, index: number) => {
-        const templates: TemplateResult[] = [];
+    const partsTemplateResults: TemplateResult[] = [];
+    for (let index = 0; index < spanText.length; ) {
+      const brLength = this.matchHtmlLineBreak(spanText, index);
+      if (brLength > 0) {
+        partsTemplateResults.push(html`<br />`);
+        index += brLength;
+        continue;
+      }
 
-        // Prepend any insertions for the current index.
-        if (insertions.has(index)) {
-          templates.push(...insertions.get(index)!);
+      const char = spanText[index];
+
+      // Prepend any insertions for the current index.
+      if (insertions.has(index)) {
+        partsTemplateResults.push(...insertions.get(index)!);
+      }
+
+      const hasBasicMathTag =
+        formattingCounters[index][InnerTagName.MATH] != null;
+      const hasDisplayMathTag =
+        formattingCounters[index][InnerTagName.MATH_DISPLAY] != null;
+      const hasMathTag = hasBasicMathTag || hasDisplayMathTag;
+
+      // Special handling for LaTeX math equations.
+      if (formattingCounters[index] && hasMathTag) {
+        equationText += char;
+        const nextIndex = index + 1;
+        const tagToCheck = hasBasicMathTag
+          ? InnerTagName.MATH
+          : InnerTagName.MATH_DISPLAY;
+        if (
+          nextIndex < spanText.length &&
+          formattingCounters[nextIndex] &&
+          formattingCounters[nextIndex][tagToCheck]
+        ) {
+          index += 1;
+          continue;
         }
 
-        const hasBasicMathTag =
-          formattingCounters[index][InnerTagName.MATH] != null;
-        const hasDisplayMathTag =
-          formattingCounters[index][InnerTagName.MATH_DISPLAY] != null;
-        const hasMathTag = hasBasicMathTag || hasDisplayMathTag;
-
-        // Special handling for LaTeX math equations.
-        if (formattingCounters[index] && hasMathTag) {
-          equationText += char;
-          // If the next character is also part of the equation, do nothing yet.
-          // We accumulate the full equation string first.
-          const nextIndex = index + 1;
-          const tagToCheck = hasBasicMathTag
-            ? InnerTagName.MATH
-            : InnerTagName.MATH_DISPLAY;
-          if (
-            nextIndex < spanText.length &&
-            formattingCounters[nextIndex] &&
-            formattingCounters[nextIndex][tagToCheck]
-          ) {
-            return templates; // Return only insertions for now
-          } else {
-            // At the end of the equation, render it using KaTeX.
-            const currentEquationText = equationText;
-            equationText = "";
-            templates.push(
-              this.renderEquation(currentEquationText, hasDisplayMathTag)
-            );
-            return templates;
-          }
-        }
-
-        // For regular characters, render them with their associated formatting.
-        templates.push(
-          this.renderFormattedCharacter(char, {
-            character: {},
-            ...formattingCounters[index],
-          })
+        const currentEquationText = equationText;
+        equationText = "";
+        partsTemplateResults.push(
+          this.renderEquation(currentEquationText, hasDisplayMathTag)
         );
+        index += 1;
+        continue;
+      }
 
-        return templates;
-      });
+      partsTemplateResults.push(
+        this.renderFormattedCharacter(char, {
+          character: {},
+          ...formattingCounters[index],
+        })
+      );
+      index += 1;
+    }
 
     // Add any insertions at the very end of the span.
     if (insertions.has(spanText.length)) {
@@ -587,7 +614,7 @@ export class ElowenSpanViz extends LightMobxLitElement {
         id=${this.span.id}
         style=${styleMap({ visibility: "hidden" })}
       >
-        ${sanitizeUnresolvedLatex(this.span.text)}
+        ${this.normalizeSpanText(this.span.text)}
       </span>`;
     }
 

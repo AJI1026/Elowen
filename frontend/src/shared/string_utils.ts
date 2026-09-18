@@ -86,6 +86,14 @@ function fallbackLatexRefText(label: string): string {
   return prefix ? `${prefix} ${name}` : name;
 }
 
+const HTML_BR_TAG_PATTERN = /<br\s*\/?>/gi;
+
+/** Converts `<br>` / `<br/>` from stored answer text into newline characters. */
+export function normalizeHtmlLineBreaks(text: string): string {
+  if (!text || !text.includes("<")) return text;
+  return text.replace(HTML_BR_TAG_PATTERN, "\n");
+}
+
 export function sanitizeUnresolvedLatex(text: string): string {
   if (!text) return text;
   if (

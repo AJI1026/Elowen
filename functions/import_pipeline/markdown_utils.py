@@ -220,6 +220,36 @@ def _apply_katex_substitutions(text: str) -> str:
     return text
 
 
+# CommonMark (mistletoe) rejects `**bold**是` when `**` is flanked by CJK letters /
+# closing punctuation like `）`. LLMs emit this constantly in Chinese answers.
+_MD_BOLD_PATTERN = re.compile(r"(?<!\*)\*\*(?!\s)([^*]+?)(?<!\s)\*\*(?!\*)")
+_ORPHAN_INLINE_HTML_TAG_PATTERN = re.compile(
+    r"</?(?:strong|b|em|i|u)(?:\s[^>]*)?>", re.IGNORECASE
+)
+_HTML_BR_TAG_PATTERN = re.compile(r"<br\s*/?>", re.IGNORECASE)
+
+
+def _normalize_markdown_bold(text: str) -> str:
+    """Rewrite ``**bold**`` to ``<strong>bold</strong>`` for CJK-adjacent emphasis."""
+    if not text or "**" not in text:
+        return text
+    return _MD_BOLD_PATTERN.sub(r"<strong>\1</strong>", text)
+
+
+def strip_orphan_inline_html_tags(text: str) -> str:
+    """Remove leftover inline HTML tags (e.g. bare ``</strong>``) from span text."""
+    if not text or "<" not in text:
+        return text
+    return _ORPHAN_INLINE_HTML_TAG_PATTERN.sub("", text)
+
+
+def normalize_html_line_breaks(text: str) -> str:
+    """Convert ``<br>`` / ``<br/>`` tags from model output into newline characters."""
+    if not text or "<" not in text:
+        return text
+    return _HTML_BR_TAG_PATTERN.sub("\n", text)
+
+
 def _protect_math_expressions(markdown: str) -> Tuple[str, dict]:
     """
     Replaces LaTeX math expressions with placeholders and returns a map to restore them.
@@ -311,6 +341,8 @@ def markdown_to_html(markdown: str) -> str:
     markdown = _apply_katex_substitutions(markdown)
     markdown = markdown.replace("\\$", "\\\\$")
     protected_markdown, math_placeholders = _protect_math_expressions(markdown)
+    # After math is protected: convert **bold** so CJK-adjacent emphasis still works.
+    protected_markdown = _normalize_markdown_bold(protected_markdown)
     with HtmlRenderer() as renderer:
         doc = Document(protected_markdown)
         html = renderer.render(doc)
@@ -341,6 +373,10 @@ def postprocess_content_text(text: str, strip_double_brackets=False) -> str:
         text = re.sub(r"\[\[.*?\]\]", "", text)
     # (4) Leftover LaTeX \ref / ~ from the importer
     text = sanitize_unresolved_latex(text)
+    # (5) Orphan </strong> / <b> etc. from mixed markdown+HTML model output
+    text = strip_orphan_inline_html_tags(text)
+    # (6) <br/> tags from mixed markdown+HTML model output
+    text = normalize_html_line_breaks(text)
     return text
 
 

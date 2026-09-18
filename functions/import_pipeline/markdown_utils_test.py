@@ -266,6 +266,30 @@ Hello, world again!"""
                 markdown_utils.markdown_to_html(markdown_input), expected_html
             )
 
+        with self.subTest("test_bold_adjacent_to_cjk"):
+            markdown_input = (
+                "又大又重。**压缩（compression）**是编码，"
+                "**剪枝（pruning）**则是删除。"
+            )
+            html = markdown_utils.markdown_to_html(markdown_input)
+            self.assertIn("<strong>压缩（compression）</strong>是编码", html)
+            self.assertIn("<strong>剪枝（pruning）</strong>则是删除", html)
+            self.assertNotIn("**压缩", html)
+
+        with self.subTest("test_orphan_strong_tags_stripped"):
+            text = "论文还做</strong>一阶球谐蒸馏</strong>"
+            self.assertEqual(
+                markdown_utils.postprocess_content_text(text),
+                "论文还做一阶球谐蒸馏",
+            )
+
+        with self.subTest("test_br_tags_become_newlines"):
+            text = "公式如下：<br/>\\alpha=1<br />结束"
+            self.assertEqual(
+                markdown_utils.postprocess_content_text(text),
+                "公式如下：\n\\alpha=1\n结束",
+            )
+
         with self.subTest("test_empty_string"):
             markdown_input = ""
             expected_html = ""
